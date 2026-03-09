@@ -1,0 +1,355 @@
+import crypto from 'node:crypto';
+
+/**
+ * In-memory store for all active Storyhand sessions.
+ *
+ * Each session is keyed by a 6-char alphanumeric ID and holds
+ * the full game state: settings, phase, players, round counter.
+ */
+const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minutes before auto-remove
+const INACTIVITY_CHECK_INTERVAL_MS = 30 * 1000; // check every 30 seconds
+
+export class SessionManager {
+  constructor() {
+    /** @type {Map<string, object>} */
+    this.sessions = new Map();
+
+    // Timers for disconnected player auto-removal: Map<"sessionId:playerId", timeout>
+    /** @type {Map<string, ReturnType<typeof setTimeout>>} */
+    this.disconnectTimers = new Map();
+
+    // Callback set by the server to handle auto-removal broadcasts
+    /** @type {((sessionId: string, event: string, data: object) => void) | null} */
+    this.onBroadcast = null;
+
+    // Start periodic inactivity check
+    this.inactivityInterval = setInterval(() => this.checkInactiveSessions(), INACTIVITY_CHECK_INTERVAL_MS);
+  }
+
+  // --- ID generation (cryptographically random) ---
+
+  generateSessionId() {
+    // 3 random bytes → 6 hex chars, uppercased
+    let id;
+    do {
+      id = crypto.randomBytes(3).toString('hex').toUpperCase();
+    } while (this.sessions.has(id)); // avoid collisions
+    return id;
+  }
+
+  generatePlayerId() {
+    return crypto.randomUUID();
+  }
+
+  // --- Session lifecycle ---
+
+  createSession(settings, hostName) {
+    const sessionId = this.generateSessionId();
+    const hostId = this.generatePlayerId();
+
+    const host = {
+      id: hostId,
+      name: hostName,
+      role: 'host',
+      vote: null,
+      hasVoted: false,
+      isConnected: true,
+      disconnectedAt: null,
+      socketId: null, // set when socket connects
+    };
+
+    const session = {
+      sessionId,
+      settings,
+      phase: 'waiting',
+      players: new Map([[hostId, host]]),
+      currentRound: 1,
+      hostId,
+      isReVoting: false,
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+    };
+
+    this.sessions.set(sessionId, session);
+
+    return { sessionId, hostId, gameState: this.getGameState(sessionId) };
+  }
+
+  joinSession(sessionId, role, name, socketId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return { error: 'Session not found' };
+    }
+
+    const playerId = this.generatePlayerId();
+    const player = {
+      id: playerId,
+      name: name || 'Observer',
+      role,
+      vote: null,
+      hasVoted: false,
+      isConnected: true,
+      disconnectedAt: null,
+      socketId,
+    };
+
+    session.players.set(playerId, player);
+    session.lastActivityAt = Date.now();
+
+    // Transition from waiting → voting when first player joins
+    if (session.phase === 'waiting' && role === 'player') {
+      session.phase = 'voting';
+    }
+
+    return {
+      playerId,
+      player: this.sanitizePlayer(player, session.phase),
+      gameState: this.getGameState(sessionId),
+    };
+  }
+
+  // --- Game actions ---
+
+  playCard(sessionId, playerId, value) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.phase !== 'voting') return { error: 'Not in voting phase' };
+
+    const player = session.players.get(playerId);
+    if (!player) return { error: 'Player not found' };
+    if (player.role !== 'player') return { error: 'Only players can vote' };
+
+    player.vote = value;
+    player.hasVoted = true;
+    session.lastActivityAt = Date.now();
+
+    return { playerId, hasVoted: true };
+  }
+
+  revealCards(sessionId, requesterId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.hostId !== requesterId) return { error: 'Only the host can reveal' };
+
+    session.phase = 'revealed';
+    session.lastActivityAt = Date.now();
+
+    // Return full player data with votes exposed
+    const players = Array.from(session.players.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role,
+      vote: p.vote,
+      hasVoted: p.hasVoted,
+      isConnected: p.isConnected,
+      disconnectedAt: p.disconnectedAt,
+    }));
+
+    return { players };
+  }
+
+  newRound(sessionId, requesterId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.hostId !== requesterId) return { error: 'Only the host can start a new round' };
+
+    session.currentRound += 1;
+    this.resetVotes(session);
+
+    return { currentRound: session.currentRound, isReVote: false };
+  }
+
+  reVote(sessionId, requesterId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.hostId !== requesterId) return { error: 'Only the host can trigger re-vote' };
+
+    this.resetVotes(session);
+    session.isReVoting = true; // flag stays until next newRound or reveal
+
+    return { currentRound: session.currentRound, isReVote: true };
+  }
+
+  // --- Connection management ---
+
+  setSocketId(sessionId, playerId, socketId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    const player = session.players.get(playerId);
+    if (player) {
+      player.socketId = socketId;
+    }
+  }
+
+  disconnectPlayer(sessionId, playerId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const player = session.players.get(playerId);
+    if (!player) return null;
+
+    player.isConnected = false;
+    player.disconnectedAt = Date.now();
+
+    // Start 2-minute grace period timer for non-host players
+    if (player.role !== 'host') {
+      const timerKey = `${sessionId}:${playerId}`;
+      // Clear any existing timer
+      if (this.disconnectTimers.has(timerKey)) {
+        clearTimeout(this.disconnectTimers.get(timerKey));
+      }
+      const timer = setTimeout(() => {
+        this.disconnectTimers.delete(timerKey);
+        this.autoRemovePlayer(sessionId, playerId);
+      }, DISCONNECT_GRACE_MS);
+      this.disconnectTimers.set(timerKey, timer);
+    }
+
+    return { playerId };
+  }
+
+  reconnectPlayer(sessionId, playerId, newSocketId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const player = session.players.get(playerId);
+    if (!player) return null;
+
+    player.isConnected = true;
+    player.disconnectedAt = null;
+    player.socketId = newSocketId;
+
+    // Cancel the auto-removal timer
+    const timerKey = `${sessionId}:${playerId}`;
+    if (this.disconnectTimers.has(timerKey)) {
+      clearTimeout(this.disconnectTimers.get(timerKey));
+      this.disconnectTimers.delete(timerKey);
+    }
+
+    return { playerId };
+  }
+
+  // Called automatically after 2-min disconnect grace period
+  autoRemovePlayer(sessionId, playerId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    const player = session.players.get(playerId);
+    if (!player || player.isConnected) return; // reconnected in time
+
+    session.players.delete(playerId);
+    console.log(`Auto-removed player ${player.name} (${playerId}) from session ${sessionId} after disconnect timeout`);
+
+    // Notify via broadcast callback
+    if (this.onBroadcast) {
+      this.onBroadcast(sessionId, 'player-left', { playerId });
+    }
+  }
+
+  leaveSession(sessionId, playerId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+
+    // If the host leaves, destroy the entire session
+    if (session.hostId === playerId) {
+      this.sessions.delete(sessionId);
+      return { playerId, sessionDestroyed: true };
+    }
+
+    session.players.delete(playerId);
+    return { playerId, sessionDestroyed: false };
+  }
+
+  // --- State queries ---
+
+  /**
+   * Returns a sanitized GameState for clients.
+   * During voting/waiting/countdown, vote values are hidden.
+   * During revealed, votes are included.
+   */
+  getGameState(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    const players = Array.from(session.players.values()).map(p =>
+      this.sanitizePlayer(p, session.phase)
+    );
+
+    return {
+      sessionId: session.sessionId,
+      settings: session.settings,
+      phase: session.phase,
+      players,
+      currentRound: session.currentRound,
+      hostId: session.hostId,
+      isReVoting: session.isReVoting,
+      countdownValue: null, // countdown is client-side only
+    };
+  }
+
+  getSession(sessionId) {
+    return this.sessions.get(sessionId) || null;
+  }
+
+  // Find which session a socket belongs to (for disconnect handling)
+  findBySocketId(socketId) {
+    for (const [sessionId, session] of this.sessions) {
+      for (const [playerId, player] of session.players) {
+        if (player.socketId === socketId) {
+          return { sessionId, playerId };
+        }
+      }
+    }
+    return null;
+  }
+
+  // --- Inactivity timeout ---
+
+  checkInactiveSessions() {
+    const now = Date.now();
+    for (const [sessionId, session] of this.sessions) {
+      const timeoutMs = (session.settings.inactivityTimeout || 30) * 60 * 1000;
+      if (now - session.lastActivityAt > timeoutMs) {
+        console.log(`Session ${sessionId} expired due to inactivity (${session.settings.inactivityTimeout} min)`);
+        this.sessions.delete(sessionId);
+
+        // Clean up any disconnect timers for this session
+        for (const [key, timer] of this.disconnectTimers) {
+          if (key.startsWith(`${sessionId}:`)) {
+            clearTimeout(timer);
+            this.disconnectTimers.delete(key);
+          }
+        }
+
+        if (this.onBroadcast) {
+          this.onBroadcast(sessionId, 'session-expired', {});
+        }
+      }
+    }
+  }
+
+  // --- Helpers ---
+
+  resetVotes(session) {
+    session.phase = 'voting';
+    session.isReVoting = false;
+    session.lastActivityAt = Date.now();
+    for (const player of session.players.values()) {
+      player.vote = null;
+      player.hasVoted = false;
+    }
+  }
+
+  sanitizePlayer(player, phase) {
+    return {
+      id: player.id,
+      name: player.name,
+      role: player.role,
+      // Only expose vote values when revealed
+      vote: phase === 'revealed' ? player.vote : null,
+      hasVoted: player.hasVoted,
+      isConnected: player.isConnected,
+      disconnectedAt: player.disconnectedAt,
+    };
+  }
+}

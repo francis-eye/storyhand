@@ -63,9 +63,8 @@ The `?` and `☕` cards are excluded from average calculations.
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React, TypeScript, Material UI, Tailwind CSS |
-| Backend | Node.js, Express *(in progress)* |
-| Real-time | Socket.IO *(in progress)* |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, Material UI |
+| Backend | Node.js, Express, Socket.IO |
 | Database | None — all data is in-memory and ephemeral |
 
 ## Getting Started
@@ -81,26 +80,39 @@ The `?` and `☕` cards are excluded from average calculations.
 git clone https://github.com/francis-eye/storyhand.git
 cd storyhand
 
-# Install dependencies
+# Start the server
+cd server
 npm install
+npm run dev
 
-# Start the dev server
+# In a second terminal, start the client
+cd client
+npm install
 npm run dev
 ```
+
+Open http://localhost:5173 in your browser.
 
 ### Project Structure
 
 ```
 storyhand/
-├── src/
-│   ├── components/     # UI components (CardDeck, GameTable, PlayerRoster, etc.)
-│   ├── pages/          # LandingPage, CreateGamePage, JoinSessionPage, SessionPage
-│   ├── hooks/          # useGameState (core state management)
-│   ├── types/          # TypeScript types (game.ts, session.ts)
-│   └── App.tsx         # Root component with routing
+├── client/
+│   ├── src/
+│   │   ├── components/   # CardDeck, GameTable, PlayerRoster, PlayingCard, etc.
+│   │   ├── pages/        # LandingPage, CreateGamePage, JoinSessionPage, SessionPage
+│   │   ├── hooks/        # useGameState (Socket.IO client + React Context)
+│   │   ├── types/        # TypeScript types (game.ts)
+│   │   ├── utils/        # Utility functions (session.ts)
+│   │   └── App.tsx       # Root component with routing
+│   └── vite.config.ts
+├── server/
+│   ├── index.js          # Express + Socket.IO server
+│   ├── sessionManager.js # In-memory session state management
+│   └── package.json
 ├── docs/
-│   └── Storyhand_PRD_v1.1.docx
-└── CLAUDE.md           # AI development context
+├── CLAUDE.md             # AI development context
+└── README.md
 ```
 
 ## Roadmap
@@ -108,9 +120,10 @@ storyhand/
 - [x] UI prototype (React + TypeScript)
 - [x] Core game state management
 - [x] Game creation, join, and session flows
-- [ ] Socket.IO backend for real-time multiplayer
-- [ ] Player disconnection handling (2-min grace period)
-- [ ] Session inactivity timeout
+- [x] Socket.IO backend for real-time multiplayer
+- [x] Player disconnection handling (2-min grace period)
+- [x] Session inactivity timeout
+- [x] Re-vote UX indicator
 - [ ] Deploy to production
 - [ ] Custom card decks
 - [ ] Session history & export
