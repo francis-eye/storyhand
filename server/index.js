@@ -1,18 +1,33 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { SessionManager } from './sessionManager.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const httpServer = createServer(app);
+
+const isProduction = process.env.NODE_ENV === 'production';
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: ['http://localhost:5173'],
-  },
+  cors: isProduction ? {} : { origin: ['http://localhost:5173'] },
 });
 
 const sessionManager = new SessionManager();
 const PORT = process.env.PORT || 3001;
+
+// In production, serve the built client files
+if (isProduction) {
+  const clientDist = path.join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientDist));
+
+  // All non-API/socket routes serve index.html (SPA client-side routing)
+  app.get(/^\/(?!health|socket\.io).*/, (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // Wire up broadcast callback for server-initiated events
 // (auto-removal after disconnect timeout, inactivity expiry)
