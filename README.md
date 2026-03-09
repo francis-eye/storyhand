@@ -1,0 +1,135 @@
+# 🃏 Storyhand
+
+**Your team's best hand for agile estimation.**
+
+Deal out story points with confidence. No sign-up required — create a session in seconds and start estimating.
+
+---
+
+## What is Storyhand?
+
+Storyhand is a real-time planning poker app for distributed teams. A Host creates a session, shares a code, and the team joins to estimate story points using a Fibonacci card deck. Votes stay hidden until everyone's played their hand, then all cards flip at once — reducing bias and keeping estimation honest.
+
+**Zero friction.** No accounts. No downloads. No setup. Just open, share, and point.
+
+## How It Works
+
+```
+Host creates session → Shares Session ID → Team joins → Everyone votes → Cards revealed → Next story
+```
+
+1. **Create** — Host names the session and picks a voting system (Fibonacci by default)
+2. **Share** — A unique Session ID is generated. Share it over Slack, Zoom, wherever
+3. **Join** — Team members enter the ID and choose to join as a Player or Observer
+4. **Vote** — Players pick a card from their deck. All votes are masked until reveal
+5. **Reveal** — Host flips all cards simultaneously. Average score and consensus are shown
+6. **Repeat** — Re-vote the same item or start a new round for the next story
+
+## Card Deck
+
+```
+0 · 1 · 2 · 3 · 5 · 8 · 13 · 21 · 34 · 55 · 89 · ? · ☕
+```
+
+| Card | Meaning |
+|------|---------|
+| `0–89` | Fibonacci point values |
+| `?` | Unsure / needs more info |
+| `☕` | Away from keyboard |
+
+The `?` and `☕` cards are excluded from average calculations.
+
+## Roles
+
+| Role | What they do |
+|------|-------------|
+| **Host** | Creates the session and facilitates. Reveals cards, starts new rounds, triggers re-votes. Does not vote. |
+| **Player** | Joins with a display name and estimates by playing cards. |
+| **Observer** | Watches the session anonymously without voting. |
+
+## Features
+
+- **Real-time multiplayer** — card plays and reveals propagate instantly
+- **Session ID joining** — no accounts, no email invites, just a code
+- **Masked voting** — no anchoring bias, cards stay hidden until the Host reveals
+- **Re-Vote** — re-estimate the same item after discussion without losing context
+- **New Round** — move to the next story with a clean slate
+- **Average + Consensus** — see the mean score and whether the team agreed
+- **Countdown animation** — optional countdown before reveal for last-second votes
+- **Configurable timeout** — sessions expire after 30 minutes of inactivity (adjustable)
+- **Responsive** — works on desktop, tablet, and mobile
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React, TypeScript, Material UI, Tailwind CSS |
+| Backend | Node.js, Express *(in progress)* |
+| Real-time | Socket.IO *(in progress)* |
+| Database | None — all data is in-memory and ephemeral |
+
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+)
+
+### Run Locally
+
+```bash
+# Clone the repo
+git clone https://github.com/francis-eye/storyhand.git
+cd storyhand
+
+# Install dependencies
+npm install
+
+# Start the dev server
+npm run dev
+```
+
+### Project Structure
+
+```
+storyhand/
+├── src/
+│   ├── components/     # UI components (CardDeck, GameTable, PlayerRoster, etc.)
+│   ├── pages/          # LandingPage, CreateGamePage, JoinSessionPage, SessionPage
+│   ├── hooks/          # useGameState (core state management)
+│   ├── types/          # TypeScript types (game.ts, session.ts)
+│   └── App.tsx         # Root component with routing
+├── docs/
+│   └── Storyhand_PRD_v1.1.docx
+└── CLAUDE.md           # AI development context
+```
+
+## Roadmap
+
+- [x] UI prototype (React + TypeScript)
+- [x] Core game state management
+- [x] Game creation, join, and session flows
+- [ ] Socket.IO backend for real-time multiplayer
+- [ ] Player disconnection handling (2-min grace period)
+- [ ] Session inactivity timeout
+- [ ] Deploy to production
+- [ ] Custom card decks
+- [ ] Session history & export
+- [ ] Jira integration
+
+## Design Decisions
+
+| Decision | Resolution |
+|----------|-----------|
+| Host voting | Non-voting facilitator only |
+| Player disconnect | Auto-removed after 2-minute grace period |
+| Re-Vote vs New Round | Both supported as distinct actions |
+| Session timeout | Default 30 min, configurable at creation |
+| Max players | 50 concurrent per session |
+
+## License
+
+MIT
+
+---
+
+Built with ☕ and story points.
