@@ -1,4 +1,4 @@
-import type { Player, CardValue } from '../types/game';
+import type { Player } from '../types/game';
 import { calculateAverage, checkConsensus } from '../utils/session';
 
 interface ResultsPanelProps {
