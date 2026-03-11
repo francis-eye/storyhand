@@ -11,9 +11,18 @@ import Footer from '../components/Footer';
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
   const navigate = useNavigate();
-  const { state, currentPlayerId, actions } = useGameState();
+  const { state, currentPlayerId, actions, isReconnecting } = useGameState();
 
-  // If no active game state, redirect to landing
+  // While reconnecting after page refresh, show a loading state instead of flashing "No active session"
+  if (isReconnecting) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <p className="text-gray-500">Reconnecting to session...</p>
+      </div>
+    );
+  }
+
+  // If no active game state, show fallback
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">

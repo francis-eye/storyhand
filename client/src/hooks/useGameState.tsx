@@ -3,6 +3,31 @@ import { io, type Socket } from 'socket.io-client';
 import type { GameState, Player, Role, CardValue, GamePhase } from '../types/game';
 import type { GameSettings } from '../types/game';
 
+// ── Socket.IO Response Types ──────────────────────────────────────────────────
+
+interface SocketResponse<T = undefined> {
+  success: boolean;
+  error?: string;
+  data?: T;
+}
+
+interface CreateSessionData {
+  sessionId: string;
+  hostId: string;
+  gameState: GameState;
+}
+
+interface JoinSessionData {
+  playerId: string;
+  gameState: GameState;
+}
+
+interface ReconnectSessionData {
+  gameState: GameState;
+}
+
+// ── Context Types ─────────────────────────────────────────────────────────────
+
 interface GameActions {
   createGame: (settings: GameSettings, hostName: string) => Promise<string>;
   joinGame: (sessionId: string, role: Role, name?: string) => Promise<void>;
@@ -20,21 +45,33 @@ interface GameContextValue {
   currentPlayerId: string | null;
   actions: GameActions;
   error: string | null;
+  isReconnecting: boolean;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
+
+// ── Provider ──────────────────────────────────────────────────────────────────
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GameState | null>(null);
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(() => {
+    // Start as true if we have stored session info and URL matches — prevents flash
+    const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
+    const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
+    if (!storedSessionId || !storedPlayerId) return false;
+    const pathMatch = window.location.pathname.match(/^\/session\/(.+)$/);
+    return !!(pathMatch && pathMatch[1] === storedSessionId);
+  });
   const socketRef = useRef<Socket | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
 
-  // Get or create socket connection
+  // ── Socket Connection ─────────────────────────────────────────────────────
+
   const getSocket = useCallback((): Socket => {
     if (!socketRef.current) {
       socketRef.current = io({ autoConnect: false });
@@ -45,7 +82,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return socketRef.current;
   }, []);
 
-  // Set up socket event listeners
+  // ── Event Listeners ───────────────────────────────────────────────────────
+
   useEffect(() => {
     const socket = getSocket();
 
@@ -195,12 +233,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
   }, [getSocket]);
 
-  // Attempt to reconnect if session info exists in sessionStorage (e.g., after page refresh)
+  // ── Reconnection (page refresh) ──────────────────────────────────────────
+
   useEffect(() => {
     const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
     const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
 
-    if (!storedSessionId || !storedPlayerId) return;
+    if (!storedSessionId || !storedPlayerId) {
+      setIsReconnecting(false);
+      return;
+    }
     if (state) return; // already have state
 
     // Only reconnect if URL matches the stored session
@@ -208,6 +250,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!pathMatch || pathMatch[1] !== storedSessionId) {
       sessionStorage.removeItem('storyhand-sessionId');
       sessionStorage.removeItem('storyhand-playerId');
+      setIsReconnecting(false);
       return;
     }
 
@@ -215,30 +258,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.emit(
       'reconnect-session',
       { sessionId: storedSessionId, playerId: storedPlayerId },
-      (response: any) => {
-        if (response.success) {
+      (response: SocketResponse<ReconnectSessionData>) => {
+        if (response.success && response.data) {
           setState(response.data.gameState);
           setCurrentPlayerId(storedPlayerId);
         } else {
           sessionStorage.removeItem('storyhand-sessionId');
           sessionStorage.removeItem('storyhand-playerId');
         }
+        setIsReconnecting(false);
       }
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getSocket]);
 
-  // --- Actions ---
+  // ── Actions ───────────────────────────────────────────────────────────────
 
   const createGame = useCallback((settings: GameSettings, hostName: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const socket = getSocket();
       setError(null);
 
-      socket.emit('create-session', { settings, hostName }, (response: any) => {
-        if (!response.success) {
-          setError(response.error);
-          reject(new Error(response.error));
+      socket.emit('create-session', { settings, hostName }, (response: SocketResponse<CreateSessionData>) => {
+        if (!response.success || !response.data) {
+          const msg = response.error || 'Failed to create session';
+          setError(msg);
+          reject(new Error(msg));
           return;
         }
 
@@ -257,10 +302,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const socket = getSocket();
       setError(null);
 
-      socket.emit('join-session', { sessionId, role, name }, (response: any) => {
-        if (!response.success) {
-          setError(response.error);
-          reject(new Error(response.error));
+      socket.emit('join-session', { sessionId, role, name }, (response: SocketResponse<JoinSessionData>) => {
+        if (!response.success || !response.data) {
+          const msg = response.error || 'Failed to join session';
+          setError(msg);
+          reject(new Error(msg));
           return;
         }
 
@@ -342,6 +388,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, [state, currentPlayerId]);
 
+  // ── Context Value ─────────────────────────────────────────────────────────
+
   const actions: GameActions = {
     createGame,
     joinGame,
@@ -355,7 +403,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, actions, error }}>
+    <GameContext.Provider value={{ state, currentPlayerId, actions, error, isReconnecting }}>
       {children}
     </GameContext.Provider>
   );
