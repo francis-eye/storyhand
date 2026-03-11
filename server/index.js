@@ -19,14 +19,11 @@ const sessionManager = new SessionManager();
 const PORT = process.env.PORT || 3001;
 
 // In production, serve the built client files
+// Note: SPA catch-all is registered AFTER API routes (below) so it doesn't intercept them
+let clientDist;
 if (isProduction) {
-  const clientDist = path.join(__dirname, '..', 'client', 'dist');
+  clientDist = path.join(__dirname, '..', 'client', 'dist');
   app.use(express.static(clientDist));
-
-  // All non-API/socket routes serve index.html (SPA client-side routing)
-  app.get(/^\/(?!health|socket\.io).*/, (req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
 }
 
 // Wire up broadcast callback for server-initiated events
@@ -215,6 +212,13 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// SPA catch-all — registered last so API routes (/health, /api/*) take priority
+if (isProduction && clientDist) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 httpServer.listen(PORT, () => {
   console.log(`Storyhand server running on http://localhost:${PORT}`);
