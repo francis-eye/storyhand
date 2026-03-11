@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import CreateGamePage from './pages/CreateGamePage';
 import JoinSessionPage from './pages/JoinSessionPage';
 import SessionPage from './pages/SessionPage';
+import PrivacyPage from './pages/PrivacyPage';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/create" element={<CreateGamePage />} />
           <Route path="/join" element={<JoinSessionPage />} />
           <Route path="/session/:sessionId" element={<SessionPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
         </Routes>
       </GameProvider>
     </BrowserRouter>
