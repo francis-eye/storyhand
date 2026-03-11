@@ -21,7 +21,7 @@ export default function HostControls({
   countdownValue,
 }: HostControlsProps) {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-full px-6 py-3 flex items-center gap-4 shadow-xl z-50">
+    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-full px-6 py-3 flex items-center gap-4 shadow-xl z-50">
       {phase === 'voting' && (
         <>
           <span className="text-sm text-gray-400">
