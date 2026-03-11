@@ -1,3 +1,5 @@
+import Footer from '../components/Footer';
+
 // Privacy policy for Storyhand
 export default function PrivacyPage() {
   return (
@@ -70,6 +72,8 @@ export default function PrivacyPage() {
           </p>
         </section>
       </div>
+
+      <Footer />
     </div>
   );
 }

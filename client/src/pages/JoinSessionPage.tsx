@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import type { Role } from '../types/game';
+import Footer from '../components/Footer';
 
 // Join session form: session ID input, role selector cards, name field
 export default function JoinSessionPage() {
@@ -106,6 +107,8 @@ export default function JoinSessionPage() {
           Join Session
         </button>
       </div>
+
+      <Footer />
     </div>
   );
 }

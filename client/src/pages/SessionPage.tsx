@@ -6,6 +6,7 @@ import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
 import HostControls from '../components/HostControls';
 import { canVote } from '../utils/session';
+import Footer from '../components/Footer';
 
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
@@ -23,6 +24,7 @@ export default function SessionPage() {
         >
           Go to Home
         </button>
+        <Footer />
       </div>
     );
   }

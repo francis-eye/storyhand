@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import type { GameSettings } from '../types/game';
+import Footer from '../components/Footer';
 
 // Create game form: game name, host name, voting system, advanced settings
 export default function CreateGamePage() {
@@ -132,6 +133,8 @@ export default function CreateGamePage() {
           Create Game
         </button>
       </div>
+
+      <Footer />
     </div>
   );
 }
