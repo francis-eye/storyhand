@@ -196,6 +196,35 @@ cd server && NODE_ENV=production node index.js
 - **Start Command:** `cd server && NODE_ENV=production node index.js`
 - Auto-deploys from `main` branch on GitHub
 
+## QA Process
+
+Every change must be tested locally before committing. Ship zero bugs.
+
+### Before Every Commit
+1. **Type-check:** `cd client && npx tsc -b` — must pass with no errors
+2. **Start server:** `cd server && node index.js` (port 3001)
+3. **Run integration tests:** Use `socket.io-client` (devDep in `server/`) to simulate multiplayer flows
+4. **Verify:** All Socket.IO events fire correctly, state transitions work, edge cases handled
+5. **Stop server** after tests pass
+
+### Test Pattern
+```javascript
+import { io } from 'socket.io-client';
+const socket = io('http://localhost:3001', { transports: ['websocket'] });
+// Create session, join players, simulate actions, assert events received
+```
+
+### What to Test
+- Happy path for the feature being changed
+- Disconnect/reconnect flows if touching session or player state
+- Host transfer if touching role logic
+- Edge cases: no players to promote, expired sessions, race conditions
+
+### When in Doubt
+- Ask Francis before proceeding — never assume
+- Use planning mode for non-trivial changes
+- Resolve all ambiguity before writing code
+
 ## Development Notes
 
 - This is a learning project — Francis is picking up React and Node.js through building this
