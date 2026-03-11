@@ -218,6 +218,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setError('Session has ended — the host left.');
     });
 
+    // When the socket reconnects (transport-level), the server creates a new socket
+    // that is NOT in any room. Re-emit reconnect-session to rejoin the room and
+    // get fresh state. Without this, the client silently stops receiving broadcasts.
+    socket.io.on('reconnect', () => {
+      const sessionId = sessionStorage.getItem('storyhand-sessionId');
+      const playerId = sessionStorage.getItem('storyhand-playerId');
+      if (!sessionId || !playerId) return;
+
+      socket.emit(
+        'reconnect-session',
+        { sessionId, playerId },
+        (response: SocketResponse<ReconnectSessionData>) => {
+          if (response.success && response.data) {
+            setState(response.data.gameState);
+            setCurrentPlayerId(playerId);
+          }
+        }
+      );
+    });
+
     return () => {
       socket.off('player-joined');
       socket.off('player-left');
@@ -229,6 +249,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('player-reconnected');
       socket.off('host-transferred');
       socket.off('session-expired');
+      socket.io.off('reconnect');
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [getSocket]);
