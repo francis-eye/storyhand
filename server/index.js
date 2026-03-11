@@ -193,11 +193,12 @@ io.on('connection', (socket) => {
   });
 
   // --- Leave session ---
-  socket.on('leave-session', ({ sessionId, playerId }) => {
+  socket.on('leave-session', ({ sessionId, playerId }, callback) => {
     const result = sessionManager.leaveSession(sessionId, playerId);
 
     if (result.error) {
       console.error(`leave-session error: ${result.error}`);
+      if (typeof callback === 'function') callback({ success: false });
       return;
     }
 
@@ -222,6 +223,9 @@ io.on('connection', (socket) => {
         console.log(`Player ${playerId} left session ${sessionId}`);
       }
     }
+
+    // Acknowledge so client can safely disconnect after server processes the leave
+    if (typeof callback === 'function') callback({ success: true });
   });
 
   // --- Disconnect (browser closed, network lost, etc.) ---

@@ -1,24 +1,23 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-
-interface HeaderProps {
-  onExit?: () => void;
-}
+import { useGameState } from '../hooks/useGameState';
 
 // App header with Storyhand logo and navigation
-export default function Header({ onExit }: HeaderProps) {
+export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { state, actions } = useGameState();
   const isLanding = location.pathname === '/';
+  const inSession = !!state;
 
   const handleExit = () => {
-    if (onExit) onExit();
+    if (inSession) actions.leaveGame();
     navigate('/');
   };
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
       <button
-        onClick={() => navigate('/')}
+        onClick={inSession ? handleExit : () => navigate('/')}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         {/* Storyhand text logo */}

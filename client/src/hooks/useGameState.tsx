@@ -175,6 +175,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.on('session-expired', () => {
       setState(null);
       setCurrentPlayerId(null);
+      sessionStorage.removeItem('storyhand-sessionId');
+      sessionStorage.removeItem('storyhand-playerId');
       setError('Session has ended — the host left.');
     });
 
@@ -191,6 +193,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('session-expired');
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
+  }, [getSocket]);
+
+  // Attempt to reconnect if session info exists in sessionStorage (e.g., after page refresh)
+  useEffect(() => {
+    const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
+    const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
+
+    if (!storedSessionId || !storedPlayerId) return;
+    if (state) return; // already have state
+
+    // Only reconnect if URL matches the stored session
+    const pathMatch = window.location.pathname.match(/^\/session\/(.+)$/);
+    if (!pathMatch || pathMatch[1] !== storedSessionId) {
+      sessionStorage.removeItem('storyhand-sessionId');
+      sessionStorage.removeItem('storyhand-playerId');
+      return;
+    }
+
+    const socket = getSocket();
+    socket.emit(
+      'reconnect-session',
+      { sessionId: storedSessionId, playerId: storedPlayerId },
+      (response: any) => {
+        if (response.success) {
+          setState(response.data.gameState);
+          setCurrentPlayerId(storedPlayerId);
+        } else {
+          sessionStorage.removeItem('storyhand-sessionId');
+          sessionStorage.removeItem('storyhand-playerId');
+        }
+      }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getSocket]);
 
   // --- Actions ---
@@ -210,6 +245,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const { sessionId, hostId, gameState } = response.data;
         setState(gameState);
         setCurrentPlayerId(hostId);
+        sessionStorage.setItem('storyhand-sessionId', sessionId);
+        sessionStorage.setItem('storyhand-playerId', hostId);
         resolve(sessionId);
       });
     });
@@ -230,6 +267,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const { playerId, gameState } = response.data;
         setState(gameState);
         setCurrentPlayerId(playerId);
+        sessionStorage.setItem('storyhand-sessionId', sessionId);
+        sessionStorage.setItem('storyhand-playerId', playerId);
         resolve();
       });
     });
@@ -276,13 +315,27 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const leaveGame = useCallback(() => {
-    if (state && currentPlayerId) {
-      socketRef.current?.emit('leave-session', {
-        sessionId: state.sessionId,
-        playerId: currentPlayerId,
-      });
+    sessionStorage.removeItem('storyhand-sessionId');
+    sessionStorage.removeItem('storyhand-playerId');
+
+    if (state && currentPlayerId && socketRef.current) {
+      const socket = socketRef.current;
+      socket.emit(
+        'leave-session',
+        { sessionId: state.sessionId, playerId: currentPlayerId },
+        () => {
+          // Server acknowledged — safe to disconnect
+          socket.disconnect();
+        }
+      );
+      // Fallback: disconnect after 2 seconds if server never acks
+      setTimeout(() => {
+        socket.disconnect();
+      }, 2000);
+    } else {
+      socketRef.current?.disconnect();
     }
-    socketRef.current?.disconnect();
+
     socketRef.current = null;
     setState(null);
     setCurrentPlayerId(null);
