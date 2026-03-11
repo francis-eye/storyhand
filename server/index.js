@@ -40,6 +40,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', sessions: sessionManager.sessions.size });
 });
 
+// Daily stats endpoint
+app.get('/api/stats', (req, res) => {
+  res.json(sessionManager.getStats());
+});
+
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 

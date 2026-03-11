@@ -1,8 +1,24 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+interface DailyStats {
+  sessionsCreated: number;
+  playersJoined: number;
+  roundsPlayed: number;
+  activeSessions: number;
+}
 
 // Landing page with hero section and Create/Join CTAs
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState<DailyStats | null>(null);
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(setStats)
+      .catch(() => {}); // silently fail — stats are non-essential
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 px-4">
@@ -47,6 +63,35 @@ export default function LandingPage() {
           <p className="text-sm text-gray-600">Instant results with consensus detection</p>
         </div>
       </div>
+
+      {/* Today's stats */}
+      {stats && (stats.sessionsCreated > 0 || stats.activeSessions > 0) && (
+        <div className="flex gap-6 mt-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-gray-800">{stats.sessionsCreated}</p>
+            <p className="text-xs text-gray-500">games today</p>
+          </div>
+          <div className="w-px bg-gray-200" />
+          <div>
+            <p className="text-2xl font-bold text-gray-800">{stats.playersJoined}</p>
+            <p className="text-xs text-gray-500">players today</p>
+          </div>
+          <div className="w-px bg-gray-200" />
+          <div>
+            <p className="text-2xl font-bold text-gray-800">{stats.roundsPlayed}</p>
+            <p className="text-xs text-gray-500">rounds today</p>
+          </div>
+          {stats.activeSessions > 0 && (
+            <>
+              <div className="w-px bg-gray-200" />
+              <div>
+                <p className="text-2xl font-bold text-green-600">{stats.activeSessions}</p>
+                <p className="text-xs text-gray-500">live now</p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

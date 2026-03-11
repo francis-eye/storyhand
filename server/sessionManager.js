@@ -14,6 +14,9 @@ export class SessionManager {
     /** @type {Map<string, object>} */
     this.sessions = new Map();
 
+    // Daily stats — resets at midnight
+    this.stats = { sessionsCreated: 0, playersJoined: 0, roundsPlayed: 0, date: this.todayString() };
+
     // Timers for disconnected player auto-removal: Map<"sessionId:playerId", timeout>
     /** @type {Map<string, ReturnType<typeof setTimeout>>} */
     this.disconnectTimers = new Map();
@@ -72,6 +75,9 @@ export class SessionManager {
 
     this.sessions.set(sessionId, session);
 
+    this.checkStatsReset();
+    this.stats.sessionsCreated++;
+
     return { sessionId, hostId, gameState: this.getGameState(sessionId) };
   }
 
@@ -95,6 +101,9 @@ export class SessionManager {
 
     session.players.set(playerId, player);
     session.lastActivityAt = Date.now();
+
+    this.checkStatsReset();
+    this.stats.playersJoined++;
 
     // Transition from waiting → voting when first player joins
     if (session.phase === 'waiting' && role === 'player') {
@@ -155,6 +164,9 @@ export class SessionManager {
 
     session.currentRound += 1;
     this.resetVotes(session);
+
+    this.checkStatsReset();
+    this.stats.roundsPlayed++;
 
     return { currentRound: session.currentRound, isReVote: false };
   }
@@ -326,6 +338,25 @@ export class SessionManager {
         }
       }
     }
+  }
+
+  // --- Stats ---
+
+  todayString() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  // Reset stats if the date has changed
+  checkStatsReset() {
+    const today = this.todayString();
+    if (this.stats.date !== today) {
+      this.stats = { sessionsCreated: 0, playersJoined: 0, roundsPlayed: 0, date: today };
+    }
+  }
+
+  getStats() {
+    this.checkStatsReset();
+    return { ...this.stats, activeSessions: this.sessions.size };
   }
 
   // --- Helpers ---
