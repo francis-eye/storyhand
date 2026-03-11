@@ -203,19 +203,20 @@ export class SessionManager {
     player.isConnected = false;
     player.disconnectedAt = Date.now();
 
-    // Start 2-minute grace period timer for non-host players
-    if (player.role !== 'host') {
-      const timerKey = `${sessionId}:${playerId}`;
-      // Clear any existing timer
-      if (this.disconnectTimers.has(timerKey)) {
-        clearTimeout(this.disconnectTimers.get(timerKey));
-      }
-      const timer = setTimeout(() => {
-        this.disconnectTimers.delete(timerKey);
-        this.autoRemovePlayer(sessionId, playerId);
-      }, DISCONNECT_GRACE_MS);
-      this.disconnectTimers.set(timerKey, timer);
+    // Start 2-minute grace period timer for all players (including host)
+    const timerKey = `${sessionId}:${playerId}`;
+    if (this.disconnectTimers.has(timerKey)) {
+      clearTimeout(this.disconnectTimers.get(timerKey));
     }
+    const timer = setTimeout(() => {
+      this.disconnectTimers.delete(timerKey);
+      if (player.role === 'host') {
+        this.autoPromoteHost(sessionId, playerId);
+      } else {
+        this.autoRemovePlayer(sessionId, playerId);
+      }
+    }, DISCONNECT_GRACE_MS);
+    this.disconnectTimers.set(timerKey, timer);
 
     return { playerId };
   }
@@ -258,12 +259,59 @@ export class SessionManager {
     }
   }
 
+  // Called when host disconnects and grace period expires
+  autoPromoteHost(sessionId, hostPlayerId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    const oldHost = session.players.get(hostPlayerId);
+    if (!oldHost || oldHost.isConnected) return; // reconnected in time
+
+    // Find the next connected player to promote
+    const nextHost = Array.from(session.players.values()).find(
+      p => p.id !== hostPlayerId && p.role === 'player' && p.isConnected
+    );
+
+    if (nextHost) {
+      // Remove the old host
+      session.players.delete(hostPlayerId);
+      // Promote the new host
+      nextHost.role = 'host';
+      session.hostId = nextHost.id;
+      console.log(`Auto-promoted ${nextHost.name} (${nextHost.id}) to host in session ${sessionId} after host disconnect`);
+
+      if (this.onBroadcast) {
+        this.onBroadcast(sessionId, 'player-left', { playerId: hostPlayerId });
+        this.onBroadcast(sessionId, 'host-transferred', { oldHostId: hostPlayerId, newHostId: nextHost.id });
+      }
+    } else {
+      // No connected players left — destroy the session
+      console.log(`Session ${sessionId} destroyed — host disconnected and no players available to promote`);
+      this.sessions.delete(sessionId);
+      if (this.onBroadcast) {
+        this.onBroadcast(sessionId, 'session-expired', {});
+      }
+    }
+  }
+
   leaveSession(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
 
-    // If the host leaves, destroy the entire session
     if (session.hostId === playerId) {
+      // Try to promote another connected player before destroying
+      const nextHost = Array.from(session.players.values()).find(
+        p => p.id !== playerId && p.role === 'player' && p.isConnected
+      );
+
+      if (nextHost) {
+        session.players.delete(playerId);
+        nextHost.role = 'host';
+        session.hostId = nextHost.id;
+        return { playerId, sessionDestroyed: false, newHostId: nextHost.id };
+      }
+
+      // No one to promote — destroy
       this.sessions.delete(sessionId);
       return { playerId, sessionDestroyed: true };
     }

@@ -206,12 +206,21 @@ io.on('connection', (socket) => {
     socket.data.playerId = null;
 
     if (result.sessionDestroyed) {
-      // Host left — tell everyone the session is over
+      // No one to promote — tell everyone the session is over
       io.to(sessionId).emit('session-expired', {});
-      console.log(`Session ${sessionId} destroyed (host left)`);
+      console.log(`Session ${sessionId} destroyed (host left, no players to promote)`);
     } else {
       io.to(sessionId).emit('player-left', { playerId });
-      console.log(`Player ${playerId} left session ${sessionId}`);
+      // If host left but another player was promoted, broadcast the transfer
+      if (result.newHostId) {
+        io.to(sessionId).emit('host-transferred', {
+          oldHostId: playerId,
+          newHostId: result.newHostId,
+        });
+        console.log(`Host left session ${sessionId}, promoted ${result.newHostId} to host`);
+      } else {
+        console.log(`Player ${playerId} left session ${sessionId}`);
+      }
     }
   });
 
