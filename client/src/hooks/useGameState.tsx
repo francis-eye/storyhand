@@ -70,11 +70,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
 
+  // Track whether socket has connected at least once (to distinguish reconnects)
+  const hasConnectedRef = useRef(false);
+
   // ── Socket Connection ─────────────────────────────────────────────────────
 
   const getSocket = useCallback((): Socket => {
     if (!socketRef.current) {
-      socketRef.current = io({ autoConnect: false });
+      // Force WebSocket transport — avoids HTTP long-polling → WebSocket upgrade
+      // cycle that causes implicit disconnects behind proxies (e.g., Railway)
+      socketRef.current = io({ autoConnect: false, transports: ['websocket'] });
     }
     if (!socketRef.current.connected) {
       socketRef.current.connect();
@@ -218,10 +223,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setError('Session has ended — the host left.');
     });
 
-    // When the socket reconnects (transport-level), the server creates a new socket
-    // that is NOT in any room. Re-emit reconnect-session to rejoin the room and
-    // get fresh state. Without this, the client silently stops receiving broadcasts.
-    socket.io.on('reconnect', () => {
+    // Re-join the server-side room after a transport reconnection.
+    // When the socket reconnects, the server creates a new socket object with no
+    // room membership — we must re-emit reconnect-session to restore it.
+    const handleConnect = () => {
+      if (!hasConnectedRef.current) {
+        hasConnectedRef.current = true;
+        return; // Skip initial connection
+      }
       const sessionId = sessionStorage.getItem('storyhand-sessionId');
       const playerId = sessionStorage.getItem('storyhand-playerId');
       if (!sessionId || !playerId) return;
@@ -236,7 +245,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           }
         }
       );
-    });
+    };
+    socket.on('connect', handleConnect);
 
     return () => {
       socket.off('player-joined');
@@ -249,7 +259,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('player-reconnected');
       socket.off('host-transferred');
       socket.off('session-expired');
-      socket.io.off('reconnect');
+      socket.off('connect', handleConnect);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [getSocket]);
