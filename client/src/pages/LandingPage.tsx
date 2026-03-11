@@ -65,7 +65,7 @@ export default function LandingPage() {
       </div>
 
       {/* Today's stats */}
-      {stats && (stats.sessionsCreated > 0 || stats.activeSessions > 0) && (
+      {stats && (
         <div className="flex gap-6 mt-4 text-center">
           <div>
             <p className="text-2xl font-bold text-gray-800">{stats.sessionsCreated}</p>
