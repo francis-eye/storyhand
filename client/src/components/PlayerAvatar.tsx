@@ -1,5 +1,5 @@
 import type { Player } from '../types/game';
-import { stringToColor } from '../utils/session';
+import { stringToColor, canVote } from '../utils/session';
 
 interface PlayerAvatarProps {
   player: Player;
@@ -35,7 +35,7 @@ export default function PlayerAvatar({ player, showVoteStatus = false }: PlayerA
         {!player.isConnected && (
           <span className="text-[10px] text-red-500">Disconnected</span>
         )}
-        {showVoteStatus && player.role === 'player' && player.isConnected && (
+        {showVoteStatus && canVote(player) && player.isConnected && (
           <span className={`text-[10px] ${player.hasVoted ? 'text-green-600' : 'text-gray-400'}`}>
             {player.hasVoted ? '✓ Voted' : 'Thinking...'}
           </span>

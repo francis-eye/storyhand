@@ -1,5 +1,5 @@
 import type { Player } from '../types/game';
-import { calculateAverage, checkConsensus } from '../utils/session';
+import { calculateAverage, checkConsensus, canVote } from '../utils/session';
 
 interface ResultsPanelProps {
   players: Player[];
@@ -8,7 +8,7 @@ interface ResultsPanelProps {
 
 // Results overlay: average, consensus banner, vote distribution
 export default function ResultsPanel({ players, showAverage }: ResultsPanelProps) {
-  const voters = players.filter(p => p.role === 'player' && p.hasVoted);
+  const voters = players.filter(p => canVote(p) && p.hasVoted);
   const votes = voters.map(p => p.vote);
   const average = calculateAverage(votes);
   const consensus = checkConsensus(votes);

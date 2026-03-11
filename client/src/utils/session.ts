@@ -1,3 +1,8 @@
+// Check if a player can vote (host and player roles)
+export function canVote(player: { role: string }): boolean {
+  return player.role === 'host' || player.role === 'player';
+}
+
 // Generate a 6-character alphanumeric session ID
 export function generateSessionId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

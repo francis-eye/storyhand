@@ -84,7 +84,7 @@ A multiplayer web app where a Host creates an estimation session, shares a Sessi
 ## Core Concepts
 
 ### User Roles
-- **Host** — Non-voting facilitator. Creates the session, reveals cards, starts new rounds, triggers re-votes. Cannot play cards.
+- **Host** — Voting facilitator. Creates the session, plays cards, reveals cards, starts new rounds, triggers re-votes. Can transfer host role to any player.
 - **Player** — Named participant who selects cards to estimate effort. Auto-removed after 2 minutes of disconnection.
 - **Observer** — Anonymous (unnamed) participant who watches the session but cannot vote.
 
@@ -108,12 +108,13 @@ A multiplayer web app where a Host creates an estimation session, shares a Sessi
 
 | Decision | Resolution |
 |----------|-----------|
-| Host voting | Non-voting facilitator only |
+| Host voting | Host can vote on cards while retaining all host controls (Reveal, Re-Vote, New Round) |
 | Player disconnect | Auto-removed after 2-min grace period; reconnect within window restores state |
 | Re-Vote vs New Round | Both supported — Re-Vote re-estimates same item, New Round moves to next |
 | Session timeout | Default 30 minutes of inactivity, configurable in Advanced Settings |
 | Max concurrent players | 50 per session |
 | Countdown | Client-side 3→2→1 animation; server sets phase to 'revealed' immediately |
+| Host transfer | Host can promote any connected player to host; old host becomes a player |
 | Vote secrecy | Server never broadcasts vote values until host reveals; only `hasVoted: true` is sent |
 
 ## File Structure
@@ -153,6 +154,7 @@ storyhand/
 - `reveal-cards` { sessionId: string } (host only)
 - `new-round` { sessionId: string } (host only)
 - `re-vote` { sessionId: string } (host only)
+- `transfer-host` { sessionId: string, newHostId: string } (host only)
 - `leave-session` { sessionId: string, playerId: string }
 
 **Server → Client (broadcast to session):**
@@ -164,6 +166,7 @@ storyhand/
 - `phase-changed` { phase: GamePhase }
 - `player-disconnected` { playerId: string }
 - `player-reconnected` { playerId: string }
+- `host-transferred` { oldHostId: string, newHostId: string }
 - `session-expired` {}
 
 ## API Endpoints

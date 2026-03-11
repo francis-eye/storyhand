@@ -5,6 +5,7 @@ import PlayerRoster from '../components/PlayerRoster';
 import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
 import HostControls from '../components/HostControls';
+import { canVote } from '../utils/session';
 
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
@@ -30,8 +31,8 @@ export default function SessionPage() {
   const isHost = currentPlayer?.role === 'host';
   const isPlayer = currentPlayer?.role === 'player';
   const isVotingPhase = state.phase === 'voting';
-  const playerCount = state.players.filter(p => p.role === 'player').length;
-  const votedCount = state.players.filter(p => p.role === 'player' && p.hasVoted).length;
+  const playerCount = state.players.filter(p => canVote(p)).length;
+  const votedCount = state.players.filter(p => canVote(p) && p.hasVoted).length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-65px)]">
@@ -49,6 +50,8 @@ export default function SessionPage() {
         <PlayerRoster
           players={state.players}
           showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
+          isCurrentUserHost={isHost}
+          onTransferHost={actions.transferHost}
         />
 
         {/* Main content area */}
@@ -61,8 +64,8 @@ export default function SessionPage() {
             countdownValue={state.countdownValue}
           />
 
-          {/* Card deck for players */}
-          {isPlayer && (
+          {/* Card deck for voters (host + players) */}
+          {(isPlayer || isHost) && (
             <div className="border-t border-gray-200 bg-white">
               <CardDeck
                 selectedValue={currentPlayer?.vote ?? null}

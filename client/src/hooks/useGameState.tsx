@@ -11,6 +11,7 @@ interface GameActions {
   startNewRound: () => void;
   reVote: () => void;
   removePlayer: (playerId: string) => void;
+  transferHost: (newHostId: string) => void;
   leaveGame: () => void;
 }
 
@@ -156,6 +157,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     });
 
+    socket.on('host-transferred', ({ oldHostId, newHostId }: { oldHostId: string; newHostId: string }) => {
+      setState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          hostId: newHostId,
+          players: prev.players.map(p => {
+            if (p.id === oldHostId) return { ...p, role: 'player' as Role };
+            if (p.id === newHostId) return { ...p, role: 'host' as Role };
+            return p;
+          }),
+        };
+      });
+    });
+
     socket.on('session-expired', () => {
       setState(null);
       setCurrentPlayerId(null);
@@ -171,6 +187,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('phase-changed');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
+      socket.off('host-transferred');
       socket.off('session-expired');
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
@@ -242,6 +259,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socketRef.current?.emit('re-vote', { sessionId: state.sessionId });
   }, [state]);
 
+  const transferHost = useCallback((newHostId: string) => {
+    if (!state) return;
+    socketRef.current?.emit('transfer-host', {
+      sessionId: state.sessionId,
+      newHostId,
+    });
+  }, [state]);
+
   const removePlayer = useCallback((playerId: string) => {
     if (!state) return;
     socketRef.current?.emit('leave-session', {
@@ -272,6 +297,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     startNewRound,
     reVote,
     removePlayer,
+    transferHost,
     leaveGame,
   };
 

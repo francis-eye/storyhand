@@ -64,7 +64,7 @@ export class SessionManager {
     const session = {
       sessionId,
       settings,
-      phase: 'waiting',
+      phase: 'voting',
       players: new Map([[hostId, host]]),
       currentRound: 1,
       hostId,
@@ -126,7 +126,7 @@ export class SessionManager {
 
     const player = session.players.get(playerId);
     if (!player) return { error: 'Player not found' };
-    if (player.role !== 'player') return { error: 'Only players can vote' };
+    if (player.role !== 'player' && player.role !== 'host') return { error: 'Only players and hosts can vote' };
 
     player.vote = value;
     player.hasVoted = true;
@@ -357,6 +357,26 @@ export class SessionManager {
   getStats() {
     this.checkStatsReset();
     return { ...this.stats, activeSessions: this.sessions.size };
+  }
+
+  // --- Host transfer ---
+
+  transferHost(sessionId, requesterId, newHostId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.hostId !== requesterId) return { error: 'Only the host can transfer' };
+
+    const newHost = session.players.get(newHostId);
+    if (!newHost) return { error: 'Player not found' };
+    if (newHost.role !== 'player') return { error: 'Can only transfer to a player' };
+
+    const oldHost = session.players.get(requesterId);
+    oldHost.role = 'player';
+    newHost.role = 'host';
+    session.hostId = newHostId;
+    session.lastActivityAt = Date.now();
+
+    return { oldHostId: requesterId, newHostId };
   }
 
   // --- Helpers ---

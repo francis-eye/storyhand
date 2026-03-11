@@ -1,6 +1,7 @@
 import type { Player, GamePhase } from '../types/game';
 import PlayingCard from './PlayingCard';
 import ResultsPanel from './ResultsPanel';
+import { canVote } from '../utils/session';
 
 interface GameTableProps {
   players: Player[];
@@ -11,7 +12,7 @@ interface GameTableProps {
 
 // Central game table showing voted cards and results overlay
 export default function GameTable({ players, phase, showAverage, countdownValue }: GameTableProps) {
-  const voters = players.filter(p => p.role === 'player');
+  const voters = players.filter(p => canVote(p));
   const votedPlayers = voters.filter(p => p.hasVoted);
   const isRevealed = phase === 'revealed';
 

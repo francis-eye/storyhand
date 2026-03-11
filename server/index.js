@@ -175,6 +175,23 @@ io.on('connection', (socket) => {
     });
   });
 
+  // --- Transfer host ---
+  socket.on('transfer-host', ({ sessionId, newHostId }) => {
+    const playerId = socket.data.playerId;
+    const result = sessionManager.transferHost(sessionId, playerId, newHostId);
+
+    if (result.error) {
+      console.error(`transfer-host error: ${result.error}`);
+      return;
+    }
+
+    io.to(sessionId).emit('host-transferred', {
+      oldHostId: result.oldHostId,
+      newHostId: result.newHostId,
+    });
+    console.log(`Host transferred from ${result.oldHostId} to ${result.newHostId} in session ${sessionId}`);
+  });
+
   // --- Leave session ---
   socket.on('leave-session', ({ sessionId, playerId }) => {
     const result = sessionManager.leaveSession(sessionId, playerId);
