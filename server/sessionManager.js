@@ -128,11 +128,17 @@ export class SessionManager {
     if (!player) return { error: 'Player not found' };
     if (player.role !== 'player' && player.role !== 'host') return { error: 'Only players and hosts can vote' };
 
-    player.vote = value;
-    player.hasVoted = true;
+    // null value = unplay (deselect) the card
+    if (value === null) {
+      player.vote = null;
+      player.hasVoted = false;
+    } else {
+      player.vote = value;
+      player.hasVoted = true;
+    }
     session.lastActivityAt = Date.now();
 
-    return { playerId, hasVoted: true };
+    return { playerId, hasVoted: player.hasVoted };
   }
 
   revealCards(sessionId, requesterId) {

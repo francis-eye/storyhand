@@ -11,7 +11,7 @@ import Footer from '../components/Footer';
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
   const navigate = useNavigate();
-  const { state, currentPlayerId, actions, isReconnecting } = useGameState();
+  const { state, currentPlayerId, selectedCard, actions, isReconnecting } = useGameState();
 
   // While reconnecting after page refresh, show a loading state instead of flashing "No active session"
   if (isReconnecting) {
@@ -79,7 +79,7 @@ export default function SessionPage() {
           {(isPlayer || isHost) && (
             <div className="border-t border-gray-200 bg-white">
               <CardDeck
-                selectedValue={currentPlayer?.vote ?? null}
+                selectedValue={selectedCard}
                 onSelect={actions.playCard}
                 disabled={!isVotingPhase}
               />

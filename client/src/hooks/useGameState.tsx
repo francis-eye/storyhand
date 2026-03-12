@@ -43,6 +43,7 @@ interface GameActions {
 interface GameContextValue {
   state: GameState | null;
   currentPlayerId: string | null;
+  selectedCard: CardValue | null;
   actions: GameActions;
   error: string | null;
   isReconnecting: boolean;
@@ -55,6 +56,7 @@ const GameContext = createContext<GameContextValue | null>(null);
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GameState | null>(null);
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CardValue | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(() => {
     // Start as true if we have stored session info and URL matches — prevents flash
@@ -70,27 +72,35 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
 
-  // Track whether socket has connected at least once (to distinguish reconnects)
-  const hasConnectedRef = useRef(false);
-
   // ── Socket Connection ─────────────────────────────────────────────────────
+  // Lazy: creates the socket instance but does NOT connect until explicitly needed.
+  // This avoids idle connections that proxies (Railway) may drop.
 
-  const getSocket = useCallback((): Socket => {
+  const getOrCreateSocket = useCallback((): Socket => {
     if (!socketRef.current) {
-      // Force WebSocket transport — avoids HTTP long-polling → WebSocket upgrade
-      // cycle that causes implicit disconnects behind proxies (e.g., Railway)
-      socketRef.current = io({ autoConnect: false, transports: ['websocket'] });
-    }
-    if (!socketRef.current.connected) {
-      socketRef.current.connect();
+      socketRef.current = io({
+        autoConnect: false,
+        transports: ['websocket'],
+      });
     }
     return socketRef.current;
   }, []);
 
+  const ensureConnected = useCallback((): Socket => {
+    const socket = getOrCreateSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
+    return socket;
+  }, [getOrCreateSocket]);
+
   // ── Event Listeners ───────────────────────────────────────────────────────
+  // Registered once on the socket instance. These fire regardless of whether
+  // the socket is currently connected — Socket.IO replays missed events on
+  // reconnection.
 
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getOrCreateSocket();
 
     socket.on('player-joined', ({ player }: { player: Player }) => {
       setState(prev => {
@@ -123,12 +133,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (!prev) return prev;
 
         if (prev.settings.showCountdown) {
-          // Start local countdown, then reveal
           pendingRevealRef.current = players;
 
           if (countdownRef.current) clearInterval(countdownRef.current);
 
-          // Set countdown phase immediately
           const withCountdown = { ...prev, phase: 'countdown' as GamePhase, countdownValue: 3 };
 
           countdownRef.current = setInterval(() => {
@@ -153,12 +161,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           return withCountdown;
         }
 
-        // No countdown — reveal immediately
         return { ...prev, phase: 'revealed', players, countdownValue: null };
       });
     });
 
     socket.on('round-reset', ({ currentRound, isReVote }: { currentRound: number; isReVote: boolean }) => {
+      setSelectedCard(null);
       setState(prev => {
         if (!prev) return prev;
         return {
@@ -218,19 +226,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.on('session-expired', () => {
       setState(null);
       setCurrentPlayerId(null);
+      setSelectedCard(null);
       sessionStorage.removeItem('storyhand-sessionId');
       sessionStorage.removeItem('storyhand-playerId');
       setError('Session has ended — the host left.');
     });
 
-    // Re-join the server-side room after a transport reconnection.
-    // When the socket reconnects, the server creates a new socket object with no
-    // room membership — we must re-emit reconnect-session to restore it.
-    const handleConnect = () => {
-      if (!hasConnectedRef.current) {
-        hasConnectedRef.current = true;
-        return; // Skip initial connection
-      }
+    // On every socket connection (initial + reconnections), re-join the
+    // server-side room if we have an active session. This handles:
+    // - Transport reconnections (socket.id changes, room membership lost)
+    // - Page refresh (sessionStorage has session info)
+    // The server's reconnect-session handler is idempotent.
+    socket.on('connect', () => {
       const sessionId = sessionStorage.getItem('storyhand-sessionId');
       const playerId = sessionStorage.getItem('storyhand-playerId');
       if (!sessionId || !playerId) return;
@@ -242,11 +249,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
           if (response.success && response.data) {
             setState(response.data.gameState);
             setCurrentPlayerId(playerId);
+          } else {
+            // Session no longer exists on server
+            sessionStorage.removeItem('storyhand-sessionId');
+            sessionStorage.removeItem('storyhand-playerId');
           }
+          setIsReconnecting(false);
         }
       );
-    };
-    socket.on('connect', handleConnect);
+    });
 
     return () => {
       socket.off('player-joined');
@@ -259,12 +270,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('player-reconnected');
       socket.off('host-transferred');
       socket.off('session-expired');
-      socket.off('connect', handleConnect);
+      socket.off('connect');
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [getSocket]);
+  }, [getOrCreateSocket]);
 
   // ── Reconnection (page refresh) ──────────────────────────────────────────
+  // If sessionStorage has session info and URL matches, connect the socket.
+  // The 'connect' handler above will automatically emit reconnect-session.
 
   useEffect(() => {
     const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
@@ -274,7 +287,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setIsReconnecting(false);
       return;
     }
-    if (state) return; // already have state
 
     // Only reconnect if URL matches the stored session
     const pathMatch = window.location.pathname.match(/^\/session\/(.+)$/);
@@ -285,29 +297,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const socket = getSocket();
-    socket.emit(
-      'reconnect-session',
-      { sessionId: storedSessionId, playerId: storedPlayerId },
-      (response: SocketResponse<ReconnectSessionData>) => {
-        if (response.success && response.data) {
-          setState(response.data.gameState);
-          setCurrentPlayerId(storedPlayerId);
-        } else {
-          sessionStorage.removeItem('storyhand-sessionId');
-          sessionStorage.removeItem('storyhand-playerId');
-        }
-        setIsReconnecting(false);
-      }
-    );
+    // Connect the socket — the 'connect' handler will rejoin the room
+    ensureConnected();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getSocket]);
+  }, [ensureConnected]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const createGame = useCallback((settings: GameSettings, hostName: string): Promise<string> => {
     return new Promise((resolve, reject) => {
-      const socket = getSocket();
+      const socket = ensureConnected();
       setError(null);
 
       socket.emit('create-session', { settings, hostName }, (response: SocketResponse<CreateSessionData>) => {
@@ -326,11 +325,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         resolve(sessionId);
       });
     });
-  }, [getSocket]);
+  }, [ensureConnected]);
 
   const joinGame = useCallback((sessionId: string, role: Role, name?: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      const socket = getSocket();
+      const socket = ensureConnected();
       setError(null);
 
       socket.emit('join-session', { sessionId, role, name }, (response: SocketResponse<JoinSessionData>) => {
@@ -349,16 +348,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
         resolve();
       });
     });
-  }, [getSocket]);
+  }, [ensureConnected]);
 
   const playCard = useCallback((value: CardValue) => {
     if (!state || !currentPlayerId) return;
+
+    // Toggle: clicking the same card unplays it
+    const newValue = selectedCard === value ? null : value;
+    setSelectedCard(newValue);
+
     socketRef.current?.emit('play-card', {
       sessionId: state.sessionId,
       playerId: currentPlayerId,
-      value,
+      value: newValue,
     });
-  }, [state, currentPlayerId]);
+  }, [state, currentPlayerId, selectedCard]);
 
   const revealCards = useCallback(() => {
     if (!state) return;
@@ -401,11 +405,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         'leave-session',
         { sessionId: state.sessionId, playerId: currentPlayerId },
         () => {
-          // Server acknowledged — safe to disconnect
           socket.disconnect();
         }
       );
-      // Fallback: disconnect after 2 seconds if server never acks
       setTimeout(() => {
         socket.disconnect();
       }, 2000);
@@ -416,6 +418,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socketRef.current = null;
     setState(null);
     setCurrentPlayerId(null);
+    setSelectedCard(null);
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, [state, currentPlayerId]);
 
@@ -434,7 +437,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, actions, error, isReconnecting }}>
+    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting }}>
       {children}
     </GameContext.Provider>
   );

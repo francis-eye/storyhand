@@ -177,6 +177,22 @@ describe('SessionManager', () => {
       expect(result.error).toBeTruthy();
     });
 
+    it('allows unplaying a card by sending null', () => {
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
+      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
+
+      sm.playCard(sessionId, playerId, 5);
+      expect(sm.getGameState(sessionId).players.find(p => p.id === playerId).hasVoted).toBe(true);
+
+      const result = sm.playCard(sessionId, playerId, null);
+      expect(result.hasVoted).toBe(false);
+
+      const state = sm.getGameState(sessionId);
+      const bob = state.players.find(p => p.id === playerId);
+      expect(bob.hasVoted).toBe(false);
+      expect(bob.vote).toBeNull();
+    });
+
     it('rejects votes outside voting phase', () => {
       const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');

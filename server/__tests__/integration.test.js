@@ -91,7 +91,7 @@ beforeAll(async () => {
     socket.on('play-card', ({ sessionId, playerId, value }) => {
       const result = sessionManager.playCard(sessionId, playerId, value);
       if (result.error) return;
-      ioServer.to(sessionId).emit('card-played', { playerId, hasVoted: true });
+      ioServer.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
     });
 
     socket.on('reveal-cards', ({ sessionId }) => {
@@ -463,6 +463,43 @@ describe('Socket.IO Integration Tests', () => {
     // Observer should NOT be counted as a voter
     const obs = finalState.players.find((p) => p.role === 'observer');
     expect(obs.hasVoted).toBe(false);
+  });
+
+  it('unplaying a card sets hasVoted to false for all participants', async () => {
+    const hostSocket = createSocket();
+    const playerSocket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
+    );
+    const { sessionId, hostId } = createResult.data;
+
+    const joinResult = await new Promise((r) =>
+      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
+    );
+    const playerId = joinResult.data.playerId;
+
+    // Player plays a card
+    const hostSeesPlay = waitForEvent(hostSocket, 'card-played');
+    const playerSeesPlay = waitForEvent(playerSocket, 'card-played');
+    playerSocket.emit('play-card', { sessionId, playerId, value: 5 });
+    const [hostPlay, playerPlay] = await Promise.all([hostSeesPlay, playerSeesPlay]);
+    expect(hostPlay.hasVoted).toBe(true);
+    expect(playerPlay.hasVoted).toBe(true);
+
+    // Player unplays (sends null)
+    const hostSeesUnplay = waitForEvent(hostSocket, 'card-played');
+    const playerSeesUnplay = waitForEvent(playerSocket, 'card-played');
+    playerSocket.emit('play-card', { sessionId, playerId, value: null });
+    const [hostUnplay, playerUnplay] = await Promise.all([hostSeesUnplay, playerSeesUnplay]);
+    expect(hostUnplay.hasVoted).toBe(false);
+    expect(playerUnplay.hasVoted).toBe(false);
+
+    // Verify server state
+    const state = sessionManager.getGameState(sessionId);
+    const bob = state.players.find((p) => p.id === playerId);
+    expect(bob.hasVoted).toBe(false);
+    expect(bob.vote).toBeNull();
   });
 
   it('session destroyed when no players to promote', async () => {

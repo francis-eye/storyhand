@@ -126,7 +126,7 @@ io.on('connection', (socket) => {
     }
 
     // Broadcast to ALL clients in the room (including sender for consistency)
-    io.to(sessionId).emit('card-played', { playerId, hasVoted: true });
+    io.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
   });
 
   // --- Reveal cards (host only) ---
