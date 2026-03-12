@@ -101,12 +101,16 @@ io.on('connection', (socket) => {
 
   // --- Reconnect to an existing session ---
   socket.on('reconnect-session', ({ sessionId, playerId }, callback) => {
+    console.log(`[reconnect] Socket ${socket.id} attempting reconnect | sessionId: ${sessionId} | playerId: ${playerId}`);
+
     // ALWAYS join the room first, unconditionally, before ANY other logic.
     socket.join(sessionId);
 
     const result = sessionManager.reconnectPlayer(sessionId, playerId, socket.id);
+    console.log(`[reconnect] reconnectPlayer result:`, result);
 
     if (!result) {
+      console.log(`[reconnect] Failed — session or player not found`);
       callback({ success: false, error: 'Session or player not found' });
       return;
     }
@@ -115,11 +119,11 @@ io.on('connection', (socket) => {
     socket.data.playerId = playerId;
 
     const gameState = sessionManager.getGameState(sessionId);
+    console.log(`[reconnect] Success. Players in session:`, gameState?.players.map((p: any) => ({ name: p.name, id: p.id, isConnected: p.isConnected })));
     callback({ success: true, data: { gameState } });
 
     // Let others know this player is back
     socket.to(sessionId).emit('player-reconnected', { playerId });
-    console.log(`Player ${playerId} reconnected to session ${sessionId}`);
   });
 
   // --- Play a card ---
@@ -235,16 +239,20 @@ io.on('connection', (socket) => {
   });
 
   // --- Disconnect (browser closed, network lost, etc.) ---
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const { sessionId, playerId } = socket.data;
-    console.log(`Socket disconnected: ${socket.id}`);
+    console.log(`[disconnect] Socket ${socket.id} reason: ${reason} | sessionId: ${sessionId} | playerId: ${playerId}`);
 
-    if (!sessionId || !playerId) return;
+    if (!sessionId || !playerId) {
+      console.log(`[disconnect] No session/player data on socket — skipping`);
+      return;
+    }
 
     const result = sessionManager.disconnectPlayer(sessionId, playerId);
+    console.log(`[disconnect] disconnectPlayer result:`, result);
     if (result) {
       io.to(sessionId).emit('player-disconnected', { playerId });
-      console.log(`Player ${playerId} disconnected from session ${sessionId}`);
+      console.log(`[disconnect] Player ${playerId} disconnected from session ${sessionId}`);
       // Host promotion is now delayed (5s) and broadcast via onBroadcast callback
     }
   });

@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
  * Each session is keyed by a 6-char alphanumeric ID and holds
  * the full game state: settings, phase, players, round counter.
  */
-const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minutes before auto-remove
+const DISCONNECT_GRACE_MS = 30 * 1000; // 30 seconds before auto-remove
 const HOST_PROMOTE_DELAY_MS = 5 * 1000; // 5 seconds before auto-promoting new host (allows refresh)
 const INACTIVITY_CHECK_INTERVAL_MS = 30 * 1000; // check every 30 seconds
 
@@ -206,11 +206,18 @@ export class SessionManager {
 
   disconnectPlayer(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
-    if (!session) return null;
+    if (!session) {
+      console.log(`[disconnectPlayer] Session ${sessionId} not found`);
+      return null;
+    }
 
     const player = session.players.get(playerId);
-    if (!player) return null;
+    if (!player) {
+      console.log(`[disconnectPlayer] Player ${playerId} not found in session ${sessionId}`);
+      return null;
+    }
 
+    console.log(`[disconnectPlayer] Marking ${player.name} (${playerId}) as disconnected. socketId was: ${player.socketId}`);
     player.isConnected = false;
     player.disconnectedAt = Date.now();
 
@@ -290,13 +297,23 @@ export class SessionManager {
     return { playerId };
   }
 
-  // Called automatically after 2-min disconnect grace period
+  // Called automatically after disconnect grace period (30s)
   autoRemovePlayer(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
-    if (!session) return;
+    if (!session) {
+      console.log(`[autoRemove] Session ${sessionId} not found — skipping`);
+      return;
+    }
 
     const player = session.players.get(playerId);
-    if (!player || player.isConnected) return; // reconnected in time
+    if (!player) {
+      console.log(`[autoRemove] Player ${playerId} not found in session ${sessionId} — skipping`);
+      return;
+    }
+    if (player.isConnected) {
+      console.log(`[autoRemove] Player ${player.name} (${playerId}) already reconnected — skipping`);
+      return; // reconnected in time
+    }
 
     session.players.delete(playerId);
     console.log(`Auto-removed player ${player.name} (${playerId}) from session ${sessionId} after disconnect timeout`);
