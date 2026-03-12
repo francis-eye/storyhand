@@ -105,6 +105,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.on('player-joined', ({ player }: { player: Player }) => {
       setState(prev => {
         if (!prev) return prev;
+        // Dedup guard: don't add if player already exists (e.g. from callback)
+        if (prev.players.some(p => p.id === player.id)) return prev;
         return { ...prev, players: [...prev.players, player] };
       });
     });

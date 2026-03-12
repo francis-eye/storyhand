@@ -367,11 +367,25 @@ const socket = io('http://localhost:3001', { transports: ['websocket'] });
 
 ## Workflow Orchestration
 
-### 1. Plan Mode Default
+### 1. Planning Protocol
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
 - If something goes sideways, STOP and re-plan immediately — don't keep pushing
 - Use plan mode for verification steps, not just building
 - Write detailed specs upfront to reduce ambiguity
+- **Write the plan to a `.md` file** (e.g., `tasks/plan-<feature>.md`) with detailed steps, affected files, and expected outcomes
+- **Scrub for assumptions:** Before presenting, re-read the plan and remove anything that assumes behavior without evidence from the code. Every claim should be traceable to a file, function, or test
+- **Argue the plan:** Present the plan to Francis and make the case — explain WHY this is the right approach, what alternatives were considered, and how you know it will work. Be constructive and specific, not hand-wavy
+- **Finalize with a DAG:** Once the plan is approved, write a `tasks/dag.json` file to track phases, dependencies, and status. Structure:
+  ```json
+  {
+    "phases": [
+      { "id": "phase-1", "name": "...", "status": "pending", "depends_on": [], "steps": ["..."] },
+      { "id": "phase-2", "name": "...", "status": "pending", "depends_on": ["phase-1"], "steps": ["..."] }
+    ]
+  }
+  ```
+- **Code check at each phase:** Run `npx tsc -b` and `npm test` after completing each phase. Update the DAG status (`"in_progress"` → `"complete"`). Do a final full code check when all phases are done
+- Skip this for simple, obvious fixes (1-2 file changes, clear bug) — don't over-process
 
 ### 2. Subagent Strategy
 - Use subagents liberally to keep main context window clean
@@ -405,12 +419,14 @@ const socket = io('http://localhost:3001', { transports: ['websocket'] });
 
 ## Task Management
 
-1. **Plan First:** Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan:** Check in before starting implementation
-3. **Track Progress:** Mark items complete as you go
-4. **Explain Changes:** High-level summary at each step
-5. **Document Results:** Add review section to `tasks/todo.md`
-6. **Capture Lessons:** Update `tasks/lessons.md` after corrections
+1. **Plan First:** Write a detailed plan to `tasks/plan-<feature>.md` — no assumptions, evidence-based
+2. **Argue the Plan:** Present it to Francis, explain why it's right, then finalize
+3. **DAG It:** Write `tasks/dag.json` with phases, dependencies, and status tracking
+4. **Track Progress:** Mark items complete as you go, high-level summary at each step
+5. **Code Check Per Phase:** Run `npx tsc -b` + `npm test` after each phase, update DAG status
+6. **Final Code Check:** Full verification when all phases complete
+7. **Document Results:** Add review section to `tasks/plan-<feature>.md`
+8. **Capture Lessons:** Update `tasks/lessons.md` after corrections
 
 ## Core Principles
 

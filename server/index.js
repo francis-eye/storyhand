@@ -239,15 +239,7 @@ io.on('connection', (socket) => {
     if (result) {
       io.to(sessionId).emit('player-disconnected', { playerId });
       console.log(`Player ${playerId} disconnected from session ${sessionId}`);
-
-      // If host disconnected and a new host was promoted immediately
-      if (result.promoted) {
-        io.to(sessionId).emit('host-transferred', {
-          oldHostId: playerId,
-          newHostId: result.promoted.newHostId,
-        });
-        console.log(`Auto-promoted ${result.promoted.newHostId} to host after host disconnect in session ${sessionId}`);
-      }
+      // Host promotion is now delayed (5s) and broadcast via onBroadcast callback
     }
   });
 });

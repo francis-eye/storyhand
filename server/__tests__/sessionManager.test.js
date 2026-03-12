@@ -23,6 +23,9 @@ describe('SessionManager', () => {
     for (const timer of sm.disconnectTimers.values()) {
       clearTimeout(timer);
     }
+    for (const timer of sm.hostPromoteTimers.values()) {
+      clearTimeout(timer);
+    }
     vi.useRealTimers();
   });
 
@@ -342,16 +345,47 @@ describe('SessionManager', () => {
       expect(sm.onBroadcast).toHaveBeenCalledWith(sessionId, 'player-left', { playerId });
     });
 
-    it('promotes new host immediately when host disconnects', () => {
+    it('delays host promotion by 5 seconds when host disconnects', () => {
       const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
+      sm.onBroadcast = vi.fn();
 
       const result = sm.disconnectPlayer(sessionId, hostId);
-      expect(result.promoted).toBeTruthy();
-      expect(result.promoted.newHostId).toBe(playerId);
+      // No immediate promotion
+      expect(result.promoted).toBeUndefined();
 
-      const state = sm.getGameState(sessionId);
+      // Host is still host before 5s
+      let state = sm.getGameState(sessionId);
+      expect(state.hostId).toBe(hostId);
+
+      // After 5s, promotion fires
+      vi.advanceTimersByTime(5000);
+      state = sm.getGameState(sessionId);
       expect(state.hostId).toBe(playerId);
+      expect(sm.onBroadcast).toHaveBeenCalledWith(sessionId, 'host-transferred', {
+        oldHostId: hostId,
+        newHostId: playerId,
+      });
+    });
+
+    it('cancels host promotion if host reconnects within 5 seconds', () => {
+      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
+      sm.joinSession(sessionId, 'player', 'Bob', 's1');
+      sm.onBroadcast = vi.fn();
+
+      sm.disconnectPlayer(sessionId, hostId);
+
+      // Host reconnects after 2s (before the 5s timer)
+      vi.advanceTimersByTime(2000);
+      sm.reconnectPlayer(sessionId, hostId, 'new-socket');
+
+      // Advance past 5s — no promotion should fire
+      vi.advanceTimersByTime(5000);
+      const state = sm.getGameState(sessionId);
+      expect(state.hostId).toBe(hostId);
+      expect(sm.onBroadcast).not.toHaveBeenCalledWith(
+        sessionId, 'host-transferred', expect.anything()
+      );
     });
   });
 

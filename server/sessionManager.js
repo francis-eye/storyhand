@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
  * the full game state: settings, phase, players, round counter.
  */
 const DISCONNECT_GRACE_MS = 2 * 60 * 1000; // 2 minutes before auto-remove
+const HOST_PROMOTE_DELAY_MS = 5 * 1000; // 5 seconds before auto-promoting new host (allows refresh)
 const INACTIVITY_CHECK_INTERVAL_MS = 30 * 1000; // check every 30 seconds
 
 export class SessionManager {
@@ -20,6 +21,10 @@ export class SessionManager {
     // Timers for disconnected player auto-removal: Map<"sessionId:playerId", timeout>
     /** @type {Map<string, ReturnType<typeof setTimeout>>} */
     this.disconnectTimers = new Map();
+
+    // Timers for delayed host promotion: Map<sessionId, timeout>
+    /** @type {Map<string, ReturnType<typeof setTimeout>>} */
+    this.hostPromoteTimers = new Map();
 
     // Callback set by the server to handle auto-removal broadcasts
     /** @type {((sessionId: string, event: string, data: object) => void) | null} */
@@ -209,12 +214,27 @@ export class SessionManager {
     player.isConnected = false;
     player.disconnectedAt = Date.now();
 
-    // Host disconnect: promote another player immediately so the session isn't blocked.
-    // The old host stays in the session as a disconnected player (2-min grace period to reconnect).
+    // Host disconnect: delay promotion by 5 seconds so page refreshes don't lose host role.
+    // If the host reconnects within 5s, the timer is cancelled and they keep their role.
     if (player.role === 'host') {
-      const promoted = this.immediateHostPromote(sessionId, playerId);
+      // Cancel any existing promote timer for this session
+      if (this.hostPromoteTimers.has(sessionId)) {
+        clearTimeout(this.hostPromoteTimers.get(sessionId));
+      }
 
-      // Start 2-min grace period to auto-remove the disconnected (now demoted) player
+      const promoteTimer = setTimeout(() => {
+        this.hostPromoteTimers.delete(sessionId);
+        const promoted = this.immediateHostPromote(sessionId, playerId);
+        if (promoted && this.onBroadcast) {
+          this.onBroadcast(sessionId, 'host-transferred', {
+            oldHostId: playerId,
+            newHostId: promoted.newHostId,
+          });
+        }
+      }, HOST_PROMOTE_DELAY_MS);
+      this.hostPromoteTimers.set(sessionId, promoteTimer);
+
+      // Start 2-min grace period to auto-remove the disconnected host
       const timerKey = `${sessionId}:${playerId}`;
       if (this.disconnectTimers.has(timerKey)) {
         clearTimeout(this.disconnectTimers.get(timerKey));
@@ -225,7 +245,7 @@ export class SessionManager {
       }, DISCONNECT_GRACE_MS);
       this.disconnectTimers.set(timerKey, timer);
 
-      return { playerId, promoted };
+      return { playerId };
     }
 
     // Non-host: standard 2-minute grace period before auto-removal
@@ -258,6 +278,13 @@ export class SessionManager {
     if (this.disconnectTimers.has(timerKey)) {
       clearTimeout(this.disconnectTimers.get(timerKey));
       this.disconnectTimers.delete(timerKey);
+    }
+
+    // Cancel the delayed host promotion if the host is reconnecting
+    if (player.role === 'host' && this.hostPromoteTimers.has(sessionId)) {
+      clearTimeout(this.hostPromoteTimers.get(sessionId));
+      this.hostPromoteTimers.delete(sessionId);
+      console.log(`Host ${player.name} reconnected before promotion timer — keeping host role`);
     }
 
     return { playerId };
@@ -389,6 +416,12 @@ export class SessionManager {
             clearTimeout(timer);
             this.disconnectTimers.delete(key);
           }
+        }
+
+        // Clean up host promote timer
+        if (this.hostPromoteTimers.has(sessionId)) {
+          clearTimeout(this.hostPromoteTimers.get(sessionId));
+          this.hostPromoteTimers.delete(sessionId);
         }
 
         if (this.onBroadcast) {

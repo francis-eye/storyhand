@@ -145,9 +145,7 @@ beforeAll(async () => {
       const result = sessionManager.disconnectPlayer(sessionId, playerId);
       if (result) {
         ioServer.to(sessionId).emit('player-disconnected', { playerId });
-        if (result.promoted) {
-          ioServer.to(sessionId).emit('host-transferred', { oldHostId: playerId, newHostId: result.promoted.newHostId });
-        }
+        // Host promotion is now delayed (5s) and broadcast via onBroadcast callback
       }
     });
   });
@@ -166,6 +164,9 @@ afterEach(() => {
 afterAll(async () => {
   clearInterval(sessionManager.inactivityInterval);
   for (const timer of sessionManager.disconnectTimers.values()) {
+    clearTimeout(timer);
+  }
+  for (const timer of sessionManager.hostPromoteTimers.values()) {
     clearTimeout(timer);
   }
   ioServer.close();
@@ -226,7 +227,7 @@ describe('Socket.IO Integration Tests', () => {
     expect(alice.vote).toBe(5);
   });
 
-  it('host disconnect triggers auto-promote', async () => {
+  it('host disconnect triggers delayed auto-promote after 5s', async () => {
     const hostSocket = createSocket();
     const playerSocket = createSocket();
 
@@ -239,7 +240,7 @@ describe('Socket.IO Integration Tests', () => {
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
     );
 
-    const transferPromise = waitForEvent(playerSocket, 'host-transferred');
+    const transferPromise = waitForEvent(playerSocket, 'host-transferred', 8000);
     hostSocket.disconnect();
 
     const transfer = await transferPromise;
@@ -614,6 +615,48 @@ describe('Socket.IO Integration Tests', () => {
     expect(resetEvent.currentRound).toBe(2);
     expect(resetEvent.isReVote).toBe(false);
   });
+
+  it('host reconnect within 5s preserves host role', async () => {
+    const hostSocket = createSocket();
+    const playerSocket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
+    );
+    const { sessionId, hostId } = createResult.data;
+
+    await new Promise((r) =>
+      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
+    );
+
+    // Host disconnects (simulates page refresh)
+    hostSocket.disconnect();
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Host reconnects quickly (within 5s)
+    const reconnectSocket = createSocket();
+    const reconnectResult = await new Promise((r) =>
+      reconnectSocket.emit('reconnect-session', { sessionId, playerId: hostId }, r)
+    );
+
+    expect(reconnectResult.success).toBe(true);
+    const { gameState } = reconnectResult.data;
+
+    // em should still be host
+    expect(gameState.hostId).toBe(hostId);
+    const host = gameState.players.find((p) => p.id === hostId);
+    expect(host.role).toBe('host');
+    expect(host.isConnected).toBe(true);
+
+    // Wait past the 5s promote window — should NOT transfer
+    await new Promise((r) => setTimeout(r, 6000));
+
+    // Verify host is still em by checking server state
+    const finalResult = await new Promise((r) =>
+      reconnectSocket.emit('reconnect-session', { sessionId, playerId: hostId }, r)
+    );
+    expect(finalResult.data.gameState.hostId).toBe(hostId);
+  }, 10000);
 
   it('joining player appears exactly once with correct roles', async () => {
     const hostSocket = createSocket();
