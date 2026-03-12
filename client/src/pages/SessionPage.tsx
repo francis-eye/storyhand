@@ -60,6 +60,7 @@ export default function SessionPage() {
         {/* Sidebar roster */}
         <PlayerRoster
           players={state.players}
+          hostId={state.hostId}
           showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
           isCurrentUserHost={isHost}
           onTransferHost={actions.transferHost}

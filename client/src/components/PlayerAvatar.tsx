@@ -4,15 +4,17 @@ import { stringToColor, canVote } from '../utils/session';
 interface PlayerAvatarProps {
   player: Player;
   showVoteStatus?: boolean;
+  hostId?: string;
 }
 
 // Colored initial avatar with role badges and vote status
-export default function PlayerAvatar({ player, showVoteStatus = false }: PlayerAvatarProps) {
+export default function PlayerAvatar({ player, showVoteStatus = false, hostId }: PlayerAvatarProps) {
   const bgColor = player.isConnected ? stringToColor(player.name) : '#9ca3af';
   const initial = player.name.charAt(0).toUpperCase();
 
-  // Role badge emoji
-  const roleBadge = player.role === 'host' ? '👑' : player.role === 'observer' ? '👁' : null;
+  // Role badge emoji — crown uses hostId (authoritative), not player.role
+  const isHost = hostId ? player.id === hostId : player.role === 'host';
+  const roleBadge = isHost ? '👑' : player.role === 'observer' ? '👁' : null;
 
   return (
     <div className="flex items-center gap-2">

@@ -44,23 +44,8 @@ app.get('/api/stats', (req, res) => {
   res.json(sessionManager.getStats());
 });
 
-// Temporary debug endpoint — remove after diagnosis
-app.get('/api/debug/rooms', (req, res) => {
-  const rooms = {};
-  for (const [roomId, sockets] of io.sockets.adapter.rooms) {
-    // Skip per-socket rooms (each socket auto-joins a room named after its own ID)
-    if (!io.sockets.sockets.has(roomId)) {
-      rooms[roomId] = { size: sockets.size, members: [...sockets] };
-    }
-  }
-  res.json({ rooms, totalConnections: io.sockets.sockets.size });
-});
-
 io.on('connection', (socket) => {
-  console.log(`[connect] Socket ${socket.id} connected. Transport: ${socket.conn.transport.name}`);
-  socket.conn.on('upgrade', (transport) => {
-    console.log(`[upgrade] Socket ${socket.id} upgraded to ${transport.name}`);
-  });
+  console.log(`Socket connected: ${socket.id}`);
 
   // --- Create a new session ---
   socket.on('create-session', ({ settings, hostName }, callback) => {
@@ -76,10 +61,7 @@ io.on('connection', (socket) => {
     // Join the Socket.IO room for this session
     socket.join(result.sessionId);
 
-    console.log(`[create-session] Session ${result.sessionId} created by ${hostName} (host: ${result.hostId})`);
-    console.log(`[create-session] socket.rooms:`, [...socket.rooms]);
-    const createRoom = io.sockets.adapter.rooms.get(result.sessionId);
-    console.log(`[create-session] Room ${result.sessionId} members:`, createRoom ? [...createRoom] : 'ROOM NOT FOUND');
+    console.log(`Session ${result.sessionId} created by ${hostName} (host: ${result.hostId})`);
 
     callback({ success: true, data: result });
   });
@@ -102,10 +84,7 @@ io.on('connection', (socket) => {
     socket.data.sessionId = sessionId;
     socket.data.playerId = result.playerId;
 
-    console.log(`[join-session] ${name || 'Observer'} (${role}) joined session ${sessionId}`);
-    console.log(`[join-session] Socket ${socket.id} joining room ${sessionId}. socket.rooms:`, [...socket.rooms]);
-    const joinRoom = io.sockets.adapter.rooms.get(sessionId);
-    console.log(`[join-session] Room ${sessionId} members (${joinRoom ? joinRoom.size : 0}):`, joinRoom ? [...joinRoom] : 'ROOM NOT FOUND');
+    console.log(`${name || 'Observer'} (${role}) joined session ${sessionId}`);
 
     // Send full state back to the joiner
     callback({ success: true, data: result });
@@ -152,11 +131,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Debug: log room state before broadcast
-    console.log(`[play-card] Socket ${socket.id} in session ${sessionId}`);
-    const playCardRoom = io.sockets.adapter.rooms.get(sessionId);
-    console.log(`[play-card] Room ${sessionId} members (${playCardRoom ? playCardRoom.size : 0}):`, playCardRoom ? [...playCardRoom] : 'ROOM NOT FOUND');
-
     // Broadcast to ALL clients in the room (including sender for consistency)
     io.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
   });
@@ -170,11 +144,6 @@ io.on('connection', (socket) => {
       console.error(`reveal-cards error: ${result.error}`);
       return;
     }
-
-    // Debug: log room state before broadcast
-    console.log(`[reveal-cards] Socket ${socket.id} in session ${sessionId}`);
-    const revealRoom = io.sockets.adapter.rooms.get(sessionId);
-    console.log(`[reveal-cards] Room ${sessionId} members (${revealRoom ? revealRoom.size : 0}):`, revealRoom ? [...revealRoom] : 'ROOM NOT FOUND');
 
     // Broadcast with full vote data to all clients
     io.to(sessionId).emit('cards-revealed', { players: result.players });
@@ -266,9 +235,9 @@ io.on('connection', (socket) => {
   });
 
   // --- Disconnect (browser closed, network lost, etc.) ---
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', () => {
     const { sessionId, playerId } = socket.data;
-    console.log(`[disconnect] Socket ${socket.id} reason: ${reason}`);
+    console.log(`Socket disconnected: ${socket.id}`);
 
     if (!sessionId || !playerId) return;
 
