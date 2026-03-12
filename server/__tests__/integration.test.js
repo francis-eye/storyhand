@@ -502,6 +502,145 @@ describe('Socket.IO Integration Tests', () => {
     expect(bob.vote).toBeNull();
   });
 
+  // --- Bug Report Regression Tests ---
+
+  it('reconnecting player does not steal host role', async () => {
+    const hostSocket = createSocket();
+    const playerSocket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
+    );
+    const { sessionId, hostId } = createResult.data;
+
+    const joinResult = await new Promise((r) =>
+      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
+    );
+    const playerId = joinResult.data.playerId;
+
+    // Player disconnects
+    playerSocket.disconnect();
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Player reconnects with new socket
+    const reconnectSocket = createSocket();
+    const reconnectResult = await new Promise((r) =>
+      reconnectSocket.emit('reconnect-session', { sessionId, playerId }, r)
+    );
+
+    expect(reconnectResult.success).toBe(true);
+    const { gameState } = reconnectResult.data;
+
+    // Host should still be em
+    expect(gameState.hostId).toBe(hostId);
+    const host = gameState.players.find((p) => p.id === hostId);
+    expect(host.name).toBe('em');
+    expect(host.role).toBe('host');
+
+    // dev1 should be a player, not host
+    const dev1 = gameState.players.find((p) => p.id === playerId);
+    expect(dev1.role).toBe('player');
+    expect(dev1.isConnected).toBe(true);
+
+    // dev1 should appear exactly once
+    const dev1Entries = gameState.players.filter((p) => p.name === 'dev1');
+    expect(dev1Entries).toHaveLength(1);
+  });
+
+  it('card-played broadcast does not leak vote values', async () => {
+    const hostSocket = createSocket();
+    const player1Socket = createSocket();
+    const player2Socket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
+    );
+    const { sessionId } = createResult.data;
+
+    const join1 = await new Promise((r) =>
+      player1Socket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
+    );
+    const p1Id = join1.data.playerId;
+    await new Promise((r) =>
+      player2Socket.emit('join-session', { sessionId, role: 'player', name: 'dev2' }, r)
+    );
+
+    const eventReceived = waitForEvent(player2Socket, 'card-played');
+    player1Socket.emit('play-card', { sessionId, playerId: p1Id, value: 13 });
+
+    const event = await eventReceived;
+    // Must NOT contain vote value
+    expect(event.vote).toBeUndefined();
+    expect(event.value).toBeUndefined();
+    expect(event.hasVoted).toBe(true);
+    expect(event.playerId).toBe(p1Id);
+  });
+
+  it('full round: create → join → vote → reveal → new round', async () => {
+    const hostSocket = createSocket();
+    const playerSocket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: { ...defaultSettings, showCountdown: false }, hostName: 'em' }, r)
+    );
+    const { sessionId, hostId } = createResult.data;
+
+    const joinResult = await new Promise((r) =>
+      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
+    );
+    const playerId = joinResult.data.playerId;
+
+    // Both vote
+    const hostCardPlayed = waitForEvent(playerSocket, 'card-played');
+    hostSocket.emit('play-card', { sessionId, playerId: hostId, value: 8 });
+    playerSocket.emit('play-card', { sessionId, playerId, value: 5 });
+    await hostCardPlayed;
+
+    // Reveal
+    const revealReceived = waitForEvent(playerSocket, 'cards-revealed');
+    hostSocket.emit('reveal-cards', { sessionId });
+    const revealEvent = await revealReceived;
+
+    // Vote values should be visible after reveal
+    const emVote = revealEvent.players.find((p) => p.id === hostId);
+    const dev1Vote = revealEvent.players.find((p) => p.id === playerId);
+    expect(emVote.vote).toBe(8);
+    expect(dev1Vote.vote).toBe(5);
+
+    // New Round
+    const roundReset = waitForEvent(playerSocket, 'round-reset');
+    hostSocket.emit('new-round', { sessionId });
+    const resetEvent = await roundReset;
+    expect(resetEvent.currentRound).toBe(2);
+    expect(resetEvent.isReVote).toBe(false);
+  });
+
+  it('joining player appears exactly once with correct roles', async () => {
+    const hostSocket = createSocket();
+    const playerSocket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
+    );
+    const { sessionId, hostId } = createResult.data;
+
+    const joinResult = await new Promise((r) =>
+      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
+    );
+    const { gameState } = joinResult.data;
+
+    // dev1 should appear exactly once
+    const dev1Entries = gameState.players.filter((p) => p.name === 'dev1');
+    expect(dev1Entries).toHaveLength(1);
+    expect(dev1Entries[0].role).toBe('player');
+
+    // em should still be host
+    const host = gameState.players.find((p) => p.id === hostId);
+    expect(host.name).toBe('em');
+    expect(host.role).toBe('host');
+    expect(gameState.hostId).toBe(hostId);
+  });
+
   it('session destroyed when no players to promote', async () => {
     const hostSocket = createSocket();
 
