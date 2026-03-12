@@ -119,7 +119,7 @@ io.on('connection', (socket) => {
     socket.data.playerId = playerId;
 
     const gameState = sessionManager.getGameState(sessionId);
-    console.log(`[reconnect] Success. Players in session:`, gameState?.players.map((p: any) => ({ name: p.name, id: p.id, isConnected: p.isConnected })));
+    console.log(`[reconnect] Success. Players in session:`, gameState?.players.map((p) => ({ name: p.name, id: p.id, isConnected: p.isConnected })));
     callback({ success: true, data: { gameState } });
 
     // Let others know this player is back
