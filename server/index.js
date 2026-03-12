@@ -12,7 +12,9 @@ const httpServer = createServer(app);
 const isProduction = process.env.NODE_ENV === 'production';
 
 const io = new Server(httpServer, {
-  cors: isProduction ? {} : { origin: ['http://localhost:5173'] },
+  // In production, client and server are same-origin (Express serves the React build),
+  // so CORS is not needed. In dev, whitelist the Vite dev server.
+  cors: isProduction ? false : { origin: ['http://localhost:5173'] },
 });
 
 const sessionManager = new SessionManager();
