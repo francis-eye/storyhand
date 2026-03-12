@@ -11,6 +11,9 @@ interface PlayerRosterProps {
 
 // Sidebar roster grouped by role: Host → Players → Observers
 export default function PlayerRoster({ players, hostId, showVoteStatus = false, isCurrentUserHost = false, onTransferHost }: PlayerRosterProps) {
+  // Temporary debug — remove after verifying crown badge fix
+  console.log('[PlayerRoster] hostId:', hostId, 'players:', players.map(p => ({ name: p.name, id: p.id, role: p.role })));
+
   const host = players.filter(p => p.role === 'host');
   const activePlayers = players.filter(p => p.role === 'player');
   const observers = players.filter(p => p.role === 'observer');
