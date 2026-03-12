@@ -86,6 +86,11 @@ io.on('connection', (socket) => {
 
   // --- Join an existing session ---
   socket.on('join-session', ({ sessionId, role, name }, callback) => {
+    // ALWAYS join the room first, unconditionally, before ANY other logic.
+    // This ensures the socket receives broadcasts even if joinSession finds
+    // the player already exists (e.g., polling→websocket transport upgrade).
+    socket.join(sessionId);
+
     const result = sessionManager.joinSession(sessionId, role, name, socket.id);
 
     if (result.error) {
@@ -96,9 +101,6 @@ io.on('connection', (socket) => {
     // Store session/player info on the socket
     socket.data.sessionId = sessionId;
     socket.data.playerId = result.playerId;
-
-    // Join the Socket.IO room
-    socket.join(sessionId);
 
     console.log(`[join-session] ${name || 'Observer'} (${role}) joined session ${sessionId}`);
     console.log(`[join-session] Socket ${socket.id} joining room ${sessionId}. socket.rooms:`, [...socket.rooms]);
@@ -120,6 +122,9 @@ io.on('connection', (socket) => {
 
   // --- Reconnect to an existing session ---
   socket.on('reconnect-session', ({ sessionId, playerId }, callback) => {
+    // ALWAYS join the room first, unconditionally, before ANY other logic.
+    socket.join(sessionId);
+
     const result = sessionManager.reconnectPlayer(sessionId, playerId, socket.id);
 
     if (!result) {
@@ -129,7 +134,6 @@ io.on('connection', (socket) => {
 
     socket.data.sessionId = sessionId;
     socket.data.playerId = playerId;
-    socket.join(sessionId);
 
     const gameState = sessionManager.getGameState(sessionId);
     callback({ success: true, data: { gameState } });
