@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import type { Role } from '../types/game';
 import Footer from '../components/Footer';
@@ -8,8 +8,10 @@ import Footer from '../components/Footer';
 export default function JoinSessionPage() {
   const navigate = useNavigate();
   const { actions } = useGameState();
+  const { sessionId: urlSessionId } = useParams<{ sessionId: string }>();
 
-  const [sessionId, setSessionId] = useState('');
+  const isInviteLink = !!urlSessionId;
+  const [sessionId, setSessionId] = useState(urlSessionId?.toUpperCase() || '');
   const [role, setRole] = useState<'player' | 'observer'>('player');
   const [name, setName] = useState('');
 
@@ -34,6 +36,12 @@ export default function JoinSessionPage() {
     <div className="max-w-md mx-auto mt-12 px-4">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Join a Session</h2>
 
+      {isInviteLink && (
+        <p className="text-sm text-gray-600 mb-4">
+          You've been invited to session <span className="font-mono font-semibold">{sessionId}</span>
+        </p>
+      )}
+
       <div className="flex flex-col gap-5">
         {/* Session ID */}
         <div>
@@ -44,7 +52,9 @@ export default function JoinSessionPage() {
             onChange={e => setSessionId(e.target.value.toUpperCase().slice(0, 6))}
             placeholder="ABC123"
             maxLength={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono text-lg tracking-widest text-center uppercase"
+            readOnly={isInviteLink}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono text-lg tracking-widest text-center uppercase
+              ${isInviteLink ? 'bg-gray-100 text-gray-500 cursor-default' : ''}`}
           />
         </div>
 

@@ -30,7 +30,7 @@ export default function PlayerAvatar({ player, showVoteStatus = false, hostId }:
           <span className="absolute -top-1 -right-1 text-xs">{roleBadge}</span>
         )}
       </div>
-      <div className="flex flex-col min-w-0">
+      <div className="flex flex-col min-w-0 whitespace-nowrap">
         <span className={`text-sm font-medium truncate ${!player.isConnected ? 'text-gray-400' : 'text-gray-800'}`}>
           {player.name}
         </span>

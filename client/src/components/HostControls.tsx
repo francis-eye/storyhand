@@ -10,7 +10,8 @@ interface HostControlsProps {
   countdownValue?: number | null;
 }
 
-// Floating dark pill with context-aware buttons
+// Mobile: static full-width bar in content flow
+// Desktop: floating dark pill (fixed position)
 export default function HostControls({
   phase,
   onReveal,
@@ -21,7 +22,7 @@ export default function HostControls({
   countdownValue,
 }: HostControlsProps) {
   return (
-    <div className="fixed bottom-28 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-full px-6 py-3 flex items-center gap-4 shadow-xl z-50">
+    <div className="bg-gray-900 text-white rounded-none md:rounded-full px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-center gap-4 shadow-xl z-50 md:fixed md:bottom-28 md:left-1/2 md:-translate-x-1/2">
       {phase === 'voting' && (
         <>
           <span className="text-sm text-gray-400">

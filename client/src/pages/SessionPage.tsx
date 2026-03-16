@@ -56,8 +56,8 @@ export default function SessionPage() {
         isReVoting={state.isReVoting}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar roster */}
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        {/* Roster: horizontal bar on mobile, sidebar on desktop */}
         <PlayerRoster
           players={state.players}
           hostId={state.hostId}
@@ -67,7 +67,7 @@ export default function SessionPage() {
         />
 
         {/* Main content area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Game table */}
           <GameTable
             players={state.players}
@@ -75,6 +75,19 @@ export default function SessionPage() {
             showAverage={state.settings.showAverage}
             countdownValue={state.countdownValue}
           />
+
+          {/* Host controls — in-flow on mobile, floating on desktop */}
+          {isHost && (
+            <HostControls
+              phase={state.phase}
+              onReveal={actions.revealCards}
+              onReVote={actions.reVote}
+              onNewRound={actions.startNewRound}
+              votedCount={votedCount}
+              totalPlayers={playerCount}
+              countdownValue={state.countdownValue}
+            />
+          )}
 
           {/* Card deck for voters (host + players) */}
           {(isPlayer || isHost) && (
@@ -88,19 +101,6 @@ export default function SessionPage() {
           )}
         </div>
       </div>
-
-      {/* Host controls */}
-      {isHost && (
-        <HostControls
-          phase={state.phase}
-          onReveal={actions.revealCards}
-          onReVote={actions.reVote}
-          onNewRound={actions.startNewRound}
-          votedCount={votedCount}
-          totalPlayers={playerCount}
-          countdownValue={state.countdownValue}
-        />
-      )}
     </div>
   );
 }
