@@ -23,14 +23,14 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 
 **Pages (5 pages):**
 - `LandingPage.tsx` — Hero with "Create Game" and "Join Game" CTAs, daily activity stats, footer with author credit and privacy policy link
-- `CreateGamePage.tsx` — Game name, host name, voting system, collapsible advanced settings (average, countdown, timeout slider)
-- `JoinSessionPage.tsx` — Session ID input (6-char, uppercase), role selector cards (Player/Observer), conditional name field, error display for invalid sessions
-- `SessionPage.tsx` — Full session layout with sidebar roster, game table, card deck (Players), host controls (Host)
+- `CreateGamePage.tsx` — Game name, host name, voting system, table theme dropdown, collapsible advanced settings (average, countdown, timeout slider)
+- `JoinSessionPage.tsx` — Session ID input (6-char, uppercase), role selector cards (Player/Observer), conditional name field, error display for invalid sessions. Supports invite links via `/join/:sessionId` route (pre-fills session ID)
+- `SessionPage.tsx` — Full session layout with sidebar roster, game table, card deck (Players), host controls (Host). Mobile responsive (horizontal roster, compact table, scroll indicators). Themed via theme registry
 - `PrivacyPage.tsx` — Privacy policy covering data collection, storage, and sharing practices
 
 **Components (9 components):**
 - `Header.tsx` — Storyhand text logo, Exit button on non-landing pages
-- `SessionHeader.tsx` — Game name, round counter, phase chip (color-coded), re-voting indicator, Session ID with copy-to-clipboard
+- `SessionHeader.tsx` — Game name, round counter, phase chip (color-coded), re-voting indicator, invite link copy button + Session ID with copy-to-clipboard
 - `PlayerRoster.tsx` — Grouped by role (Host → Players → Observers), with dividers and counts, vote status indicators
 - `PlayerAvatar.tsx` — Colored initial avatar, role badges (crown/eye), vote status, disconnected visual treatment (greyed out + red label)
 - `GameTable.tsx` — Poker table with voted cards (pseudo-random rotation), vote counter, 3-2-1 countdown animation, results overlay
@@ -62,7 +62,8 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 - `GamePhase`: 'waiting' | 'voting' | 'countdown' | 'revealed'
 - `CardValue`: number | '?' | '☕'
 - `Player`: id, name, role, vote, hasVoted, isConnected, disconnectedAt
-- `GameSettings`: gameName, votingSystem, showAverage, showCountdown, inactivityTimeout
+- `TableTheme`: 'classic' | '16bit'
+- `GameSettings`: gameName, votingSystem, showAverage, showCountdown, inactivityTimeout, tableTheme
 - `GameState`: sessionId, settings, phase, players, currentRound, hostId, isReVoting, countdownValue
 - `FIBONACCI_DECK`: readonly array of all 13 card values
 
@@ -75,10 +76,10 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 
 ### What Could Be Built Next
 
+- More table themes — Dark Mode, Casino Royale, Sketch/Whiteboard (see PRD_GAME_TABLE_THEMES.md for candidates)
 - Custom card decks — T-shirt sizes, powers of 2, etc.
 - Session history & export — save results for retrospectives
 - Jira integration — pull stories directly into rounds
-- Reconnection on page refresh — `reconnect-session` event exists on server but client doesn't persist session/player IDs across refreshes yet
 - Re-Vote UX enhancement — the "Re-voting..." chip exists but could retain ticket context
 
 ## Core Concepts
@@ -129,7 +130,8 @@ storyhand/
 │   │   ├── components/       # Header, SessionHeader, CardDeck, PlayingCard, GameTable,
 │   │   │                     # PlayerRoster, PlayerAvatar, HostControls, ResultsPanel
 │   │   ├── pages/            # LandingPage, CreateGamePage, JoinSessionPage, SessionPage, PrivacyPage
-│   │   ├── hooks/            # useGameState (Socket.IO client + React Context)
+│   │   ├── hooks/            # useGameState (Socket.IO client + React Context), useIsMobile
+│   │   ├── themes/           # themeRegistry.ts (ThemeConfig interface + theme definitions)
 │   │   ├── types/            # game.ts
 │   │   ├── utils/            # session.ts
 │   │   ├── App.tsx
@@ -173,6 +175,7 @@ These files and patterns are stable. Do not refactor, rename, reorganize, or "im
 - **Privacy page (`PrivacyPage.tsx`)** — Static content, no logic. Leave it alone.
 - **Landing page stats display** — The `/api/stats` endpoint and landing page activity stats are working. Don't modify the stats schema.
 - **CSS card flip animation** — The 3D flip in `PlayingCard.tsx` and supporting CSS classes in `index.css` (`perspective-1000`, `transform-style-3d`, `backface-hidden`, `rotate-y-180`) are carefully tuned. Don't simplify or "clean up" the transform chain.
+- **Theme registry structure (`themes/themeRegistry.ts`)** — The `ThemeConfig` interface and registry pattern are stable. Add new themes by defining a new config object, not by changing the interface or how components consume it.
 
 ## Coupling Map — If You Change X, Also Check Y
 
@@ -190,6 +193,17 @@ sessionManager.js (server)
   │   │   └── CardDeck.tsx        — reads currentUser.vote for selection state
   │   └── SessionHeader.tsx       — reads gameState.phase, currentRound, isReVoting
   └── game.ts (types)             — shared type contract (Player, GameState, etc.)
+
+themeRegistry.ts (themes)
+  ├── SessionPage.tsx             — passes theme to all session components
+  ├── GameTable.tsx               — table background, border, scanlines
+  ├── PlayingCard.tsx             — card face-up/face-down/selected styles
+  ├── CardDeck.tsx                — deck tray background, scroll fade
+  ├── PlayerRoster.tsx            — roster background, text colors
+  ├── PlayerAvatar.tsx            — name/status text colors
+  ├── ResultsPanel.tsx            — panel background, bar colors
+  ├── HostControls.tsx            — pill background, button styles
+  └── SessionHeader.tsx           — header background, chip colors
 
 If you change...                  Also verify...
 ─────────────────────────────────────────────────────────────────

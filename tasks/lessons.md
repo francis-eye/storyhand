@@ -162,3 +162,42 @@ The cost of one extra deploy with a debug log is far less than shipping a "fix" 
 2. Type-check (`cd client && npx tsc -b`)
 3. Start server + client locally, open 3 browser windows, verify the change works end-to-end
 4. Only then commit and push to main
+
+---
+
+## 12. The server is settings-agnostic — use that
+
+**What happened:** When implementing game table themes, we added a `tableTheme` field to `GameSettings`. Zero server changes were needed — `sessionManager.js` stores and returns `settings` as-is, and `index.js` passes it through unchanged.
+
+**Lesson:** The server's settings pass-through design means any new client-side feature that only needs a setting stored and broadcast can be added by:
+1. Adding the field to `GameSettings` in `game.ts`
+2. Adding the UI control in `CreateGamePage.tsx`
+3. Reading it from `state.settings` in session components
+
+No server code, no new Socket.IO events, no new handlers. This is a strength of the architecture — don't break it by putting settings validation or transformation in the server unless absolutely necessary.
+
+**How to apply:** Before touching server code for a new feature, ask: "Can this be a settings field that passes through?" If yes, keep it client-only.
+
+---
+
+## 13. CSS class string registries are a clean theming pattern
+
+**What happened:** Implemented a theme system using a TypeScript registry (`themeRegistry.ts`) that maps theme IDs to objects full of Tailwind CSS class strings. Components receive a `theme: ThemeConfig` prop and swap their hardcoded classes for `theme.x.y`. Classic theme maps to the exact original classes — zero visual change.
+
+**Lesson:** This pattern works well because:
+- No CSS variables, no runtime style computation, no separate component trees
+- Adding a new theme = adding one new object to the registry
+- Components stay simple — they just apply class strings from the theme config
+- TypeScript catches missing theme fields at compile time
+
+**How to apply:** When adding visual variants to components, prefer a config object of class strings over conditional logic scattered across components. Keep the config centralized in one file.
+
+---
+
+## 14. Plan mode + local testing = zero production incidents
+
+**What happened:** This session implemented two features (mobile responsive layout + game table themes) across 13+ files with zero production incidents. Both features were planned in plan mode, type-checked, tested locally, and verified before pushing.
+
+**Lesson:** The previous session had multiple production incidents from shipping untested code. This session had none because we followed the protocol: plan → implement → type-check → test locally → push. The extra 5 minutes of local testing saves hours of fix-deploy-fail cycles.
+
+**How to apply:** This is the protocol. No exceptions. The temptation to "just push it" is always wrong.
