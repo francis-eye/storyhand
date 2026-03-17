@@ -1,1 +1,33 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* 16-bit pixel font utility */
+.font-pixel {
+  font-family: 'Press Start 2P', cursive;
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
+}
+
+/* Scanline overlay for 16-bit game table */
+.theme-16bit-scanlines {
+  position: relative;
+}
+.theme-16bit-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.03) 0px,
+    rgba(0, 0, 0, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Retro glow on key elements */
+.theme-16bit-glow {
+  text-shadow: 0 0 8px rgba(255, 165, 0, 0.6), 0 0 16px rgba(255, 165, 0, 0.3);
+}

@@ -1,13 +1,15 @@
 import type { Player } from '../types/game';
+import type { ThemeConfig } from '../themes/themeRegistry';
 import { calculateAverage, checkConsensus, canVote } from '../utils/session';
 
 interface ResultsPanelProps {
   players: Player[];
   showAverage: boolean;
+  theme: ThemeConfig;
 }
 
 // Results overlay: average, consensus banner, vote distribution
-export default function ResultsPanel({ players, showAverage }: ResultsPanelProps) {
+export default function ResultsPanel({ players, showAverage, theme }: ResultsPanelProps) {
   const voters = players.filter(p => canVote(p) && p.hasVoted);
   const votes = voters.map(p => p.vote);
   const average = calculateAverage(votes);
@@ -28,31 +30,31 @@ export default function ResultsPanel({ players, showAverage }: ResultsPanelProps
     Math.max(...numericVotes) / Math.max(Math.min(...numericVotes), 1) > 5;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
+    <div className={`rounded-xl p-6 max-w-sm w-full ${theme.results.background}`}>
       {/* Consensus banner */}
       {consensus && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 mb-4 text-center">
-          <span className="text-green-700 font-semibold">Consensus reached!</span>
+        <div className={`border rounded-lg px-4 py-2 mb-4 text-center ${theme.results.consensusBg} ${theme.results.consensusBorder}`}>
+          <span className={`font-semibold ${theme.results.consensusText}`}>Consensus reached!</span>
         </div>
       )}
 
       {/* High variance warning */}
       {hasHighVariance && !consensus && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mb-4 text-center">
-          <span className="text-amber-700 font-medium text-sm">High variance — consider discussing</span>
+        <div className={`border rounded-lg px-4 py-2 mb-4 text-center ${theme.results.varianceBg} ${theme.results.varianceBorder}`}>
+          <span className={`font-medium text-sm ${theme.results.varianceText}`}>High variance — consider discussing</span>
         </div>
       )}
 
       {/* Average */}
       {showAverage && average !== null && (
         <div className="text-center mb-4">
-          <p className="text-sm text-gray-500">Average</p>
-          <p className="text-3xl font-bold text-gray-800">{average}</p>
+          <p className={`text-sm ${theme.results.averageLabel}`}>Average</p>
+          <p className={`text-3xl font-bold ${theme.results.averageValue}`}>{average}</p>
         </div>
       )}
 
       {/* Vote count */}
-      <p className="text-sm text-gray-500 text-center mb-3">
+      <p className={`text-sm text-center mb-3 ${theme.results.voteCountText}`}>
         {voters.length} vote{voters.length !== 1 ? 's' : ''}
       </p>
 
@@ -68,14 +70,14 @@ export default function ResultsPanel({ players, showAverage }: ResultsPanelProps
           })
           .map(([value, count]) => (
             <div key={value} className="flex items-center gap-2">
-              <span className="w-8 text-right text-sm font-medium text-gray-600">{value}</span>
-              <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+              <span className={`w-8 text-right text-sm font-medium ${theme.results.barLabel}`}>{value}</span>
+              <div className={`flex-1 rounded-full h-5 overflow-hidden ${theme.results.barBg}`}>
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                  className={`h-full rounded-full transition-all duration-500 ${theme.results.barFill}`}
                   style={{ width: `${(count / maxCount) * 100}%` }}
                 />
               </div>
-              <span className="w-6 text-sm text-gray-500">{count}</span>
+              <span className={`w-6 text-sm ${theme.results.barCount}`}>{count}</span>
             </div>
           ))}
       </div>

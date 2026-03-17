@@ -6,6 +6,7 @@ import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
 import HostControls from '../components/HostControls';
 import { canVote } from '../utils/session';
+import { getTheme } from '../themes/themeRegistry';
 import Footer from '../components/Footer';
 
 // Full session view: sidebar roster, game table, card deck, host controls
@@ -38,6 +39,7 @@ export default function SessionPage() {
     );
   }
 
+  const theme = getTheme(state.settings.tableTheme);
   const currentPlayer = state.players.find(p => p.id === currentPlayerId);
   const isHost = currentPlayer?.role === 'host';
   const isPlayer = currentPlayer?.role === 'player';
@@ -46,7 +48,7 @@ export default function SessionPage() {
   const votedCount = state.players.filter(p => canVote(p) && p.hasVoted).length;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-65px)]">
+    <div className={`flex flex-col h-[calc(100vh-65px)] ${theme.wrapper}`}>
       {/* Session header */}
       <SessionHeader
         gameName={state.settings.gameName}
@@ -54,6 +56,7 @@ export default function SessionPage() {
         currentRound={state.currentRound}
         phase={state.phase}
         isReVoting={state.isReVoting}
+        theme={theme}
       />
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -64,6 +67,7 @@ export default function SessionPage() {
           showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
           isCurrentUserHost={isHost}
           onTransferHost={actions.transferHost}
+          theme={theme}
         />
 
         {/* Main content area */}
@@ -74,6 +78,7 @@ export default function SessionPage() {
             phase={state.phase}
             showAverage={state.settings.showAverage}
             countdownValue={state.countdownValue}
+            theme={theme}
           />
 
           {/* Host controls — in-flow on mobile, floating on desktop */}
@@ -86,18 +91,18 @@ export default function SessionPage() {
               votedCount={votedCount}
               totalPlayers={playerCount}
               countdownValue={state.countdownValue}
+              theme={theme}
             />
           )}
 
           {/* Card deck for voters (host + players) */}
           {(isPlayer || isHost) && (
-            <div className="border-t border-gray-200 bg-white">
-              <CardDeck
-                selectedValue={selectedCard}
-                onSelect={actions.playCard}
-                disabled={!isVotingPhase}
-              />
-            </div>
+            <CardDeck
+              selectedValue={selectedCard}
+              onSelect={actions.playCard}
+              disabled={!isVotingPhase}
+              theme={theme}
+            />
           )}
         </div>
       </div>

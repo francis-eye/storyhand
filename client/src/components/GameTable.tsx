@@ -1,4 +1,5 @@
 import type { Player, GamePhase } from '../types/game';
+import type { ThemeConfig } from '../themes/themeRegistry';
 import PlayingCard from './PlayingCard';
 import ResultsPanel from './ResultsPanel';
 import { canVote } from '../utils/session';
@@ -9,10 +10,11 @@ interface GameTableProps {
   phase: GamePhase;
   showAverage: boolean;
   countdownValue?: number | null;
+  theme: ThemeConfig;
 }
 
 // Central game table showing voted cards and results overlay
-export default function GameTable({ players, phase, showAverage, countdownValue }: GameTableProps) {
+export default function GameTable({ players, phase, showAverage, countdownValue, theme }: GameTableProps) {
   const isMobile = useIsMobile();
   const voters = players.filter(p => canVote(p));
   const votedPlayers = voters.filter(p => p.hasVoted);
@@ -21,14 +23,14 @@ export default function GameTable({ players, phase, showAverage, countdownValue 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-3 md:p-6 gap-3 md:gap-6 relative">
       {/* Vote counter */}
-      <p className="text-sm text-gray-500">
+      <p className={`text-sm ${theme.table.voteCountText}`}>
         {votedPlayers.length} of {voters.length} players voted
       </p>
 
       {/* Poker table */}
-      <div className="relative bg-gradient-to-br from-emerald-100 to-emerald-50 rounded-2xl min-h-[180px] md:min-h-[280px] w-full max-w-2xl flex items-center justify-center p-4 md:p-8 border border-emerald-200">
+      <div className={`relative min-h-[180px] md:min-h-[280px] w-full max-w-2xl flex items-center justify-center p-4 md:p-8 ${theme.table.background} ${theme.table.border} ${theme.table.scanlines ? 'theme-16bit-scanlines' : ''}`}>
         {votedPlayers.length === 0 ? (
-          <p className="text-emerald-400 text-sm">Waiting for votes...</p>
+          <p className={`text-sm ${theme.table.emptyText}`}>Waiting for votes...</p>
         ) : (
           <div className="flex flex-wrap gap-3 md:gap-4 justify-center">
             {votedPlayers.map((player, i) => {
@@ -44,8 +46,9 @@ export default function GameTable({ players, phase, showAverage, countdownValue 
                     value={player.vote!}
                     faceUp={isRevealed}
                     size={isMobile ? 'small' : 'medium'}
+                    theme={theme}
                   />
-                  <span className="text-xs text-gray-600 font-medium mt-1">
+                  <span className={`text-xs font-medium mt-1 ${theme.table.voteCountText}`}>
                     {player.name}
                   </span>
                 </div>
@@ -56,15 +59,15 @@ export default function GameTable({ players, phase, showAverage, countdownValue 
 
         {/* Countdown overlay */}
         {phase === 'countdown' && (
-          <div className="absolute inset-0 bg-black/20 rounded-2xl flex items-center justify-center">
-            <span className="text-5xl font-bold text-white animate-bounce">{countdownValue ?? 3}</span>
+          <div className={`absolute inset-0 flex items-center justify-center ${theme.countdown.overlayBg} ${theme.table.border.includes('rounded') ? 'rounded-2xl' : ''}`}>
+            <span className={`text-5xl font-bold animate-bounce ${theme.countdown.text}`}>{countdownValue ?? 3}</span>
           </div>
         )}
       </div>
 
       {/* Results panel shown after reveal */}
       {isRevealed && (
-        <ResultsPanel players={players} showAverage={showAverage} />
+        <ResultsPanel players={players} showAverage={showAverage} theme={theme} />
       )}
     </div>
   );

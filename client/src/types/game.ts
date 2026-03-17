@@ -18,6 +18,9 @@ export interface Player {
   disconnectedAt: number | null;
 }
 
+// Available table themes
+export type TableTheme = 'classic' | '16bit';
+
 // Configuration set when creating a game
 export interface GameSettings {
   gameName: string;
@@ -25,6 +28,7 @@ export interface GameSettings {
   showAverage: boolean;
   showCountdown: boolean;
   inactivityTimeout: number; // minutes
+  tableTheme: TableTheme;
 }
 
 // Full state of an active session

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
-import type { GameSettings } from '../types/game';
+import type { GameSettings, TableTheme } from '../types/game';
+import { getAllThemes } from '../themes/themeRegistry';
 import Footer from '../components/Footer';
 
 // Create game form: game name, host name, voting system, advanced settings
@@ -15,6 +16,7 @@ export default function CreateGamePage() {
   const [showAverage, setShowAverage] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
   const [inactivityTimeout, setInactivityTimeout] = useState(30);
+  const [tableTheme, setTableTheme] = useState<TableTheme>('classic');
 
   const canCreate = gameName.trim() && hostName.trim();
 
@@ -27,6 +29,7 @@ export default function CreateGamePage() {
       showAverage,
       showCountdown,
       inactivityTimeout,
+      tableTheme,
     };
 
     try {
@@ -72,6 +75,22 @@ export default function CreateGamePage() {
           <div className="px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm">
             Fibonacci (0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, ?, ☕)
           </div>
+        </div>
+
+        {/* Table theme */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Table Theme</label>
+          <select
+            value={tableTheme}
+            onChange={e => setTableTheme(e.target.value as TableTheme)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-sm"
+          >
+            {getAllThemes().map(t => (
+              <option key={t.id} value={t.id}>
+                {t.icon} {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Advanced settings toggle */}

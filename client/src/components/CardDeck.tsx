@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { FIBONACCI_DECK, type CardValue } from '../types/game';
+import type { ThemeConfig } from '../themes/themeRegistry';
 import PlayingCard from './PlayingCard';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -7,11 +8,12 @@ interface CardDeckProps {
   selectedValue: CardValue | null;
   onSelect: (value: CardValue) => void;
   disabled?: boolean;
+  theme: ThemeConfig;
 }
 
 // Horizontal card deck for players to select their vote
 // On mobile: smaller cards with scroll fade indicator
-export default function CardDeck({ selectedValue, onSelect, disabled = false }: CardDeckProps) {
+export default function CardDeck({ selectedValue, onSelect, disabled = false, theme }: CardDeckProps) {
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showFade, setShowFade] = useState(false);
@@ -36,7 +38,7 @@ export default function CardDeck({ selectedValue, onSelect, disabled = false }: 
   }, []);
 
   return (
-    <div className="relative w-full">
+    <div className={`relative w-full border-t ${theme.deck.border} ${theme.deck.background}`}>
       <div ref={scrollRef} className="w-full overflow-x-auto py-2 md:py-4 px-2">
         <div className="flex gap-1.5 md:gap-2 justify-center min-w-max">
           {FIBONACCI_DECK.map((value) => (
@@ -48,6 +50,7 @@ export default function CardDeck({ selectedValue, onSelect, disabled = false }: 
               size={isMobile ? 'small' : 'medium'}
               disabled={disabled}
               onClick={() => onSelect(value)}
+              theme={theme}
             />
           ))}
         </div>
@@ -55,7 +58,7 @@ export default function CardDeck({ selectedValue, onSelect, disabled = false }: 
 
       {/* Scroll fade indicator — mobile only */}
       {showFade && (
-        <div className="md:hidden absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l from-white to-transparent" />
+        <div className={`md:hidden absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l ${theme.deck.fadeGradient} to-transparent`} />
       )}
     </div>
   );
