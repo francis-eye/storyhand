@@ -27,6 +27,15 @@
   z-index: 10;
 }
 
+/* Fade-in animation for toasts */
+@keyframes fade-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
 /* Retro glow on key elements */
 .theme-16bit-glow {
   text-shadow: 0 0 8px rgba(255, 165, 0, 0.6), 0 0 16px rgba(255, 165, 0, 0.3);

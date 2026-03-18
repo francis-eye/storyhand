@@ -1,11 +1,13 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
+import { useFeedback } from '../hooks/useFeedback';
 
 // App header with Storyhand logo and navigation
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const { state, actions } = useGameState();
+  const { openFeedback } = useFeedback();
   const isLanding = location.pathname === '/';
   const inSession = !!state;
 
@@ -27,14 +29,24 @@ export default function Header() {
         </span>
       </button>
 
-      {!isLanding && (
-        <button
-          onClick={handleExit}
-          className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          Exit
-        </button>
-      )}
+      <div className="flex items-center gap-2">
+        {!isLanding && (
+          <button
+            onClick={openFeedback}
+            className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Feedback
+          </button>
+        )}
+        {!isLanding && (
+          <button
+            onClick={handleExit}
+            className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Exit
+          </button>
+        )}
+      </div>
     </header>
   );
 }

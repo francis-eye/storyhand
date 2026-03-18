@@ -238,6 +238,55 @@ io.on('connection', (socket) => {
     if (typeof callback === 'function') callback({ success: true });
   });
 
+  // --- Submit feedback (fire-and-forget, no callback) ---
+  socket.on('submit-feedback', (data) => {
+    // Rate limit: max 3 feedback submissions per socket connection
+    socket.data.feedbackCount = (socket.data.feedbackCount || 0) + 1;
+    if (socket.data.feedbackCount > 3) {
+      console.warn(`[submit-feedback] Rate limited socket ${socket.id}`);
+      return;
+    }
+
+    const sentiment = Number(data && data.sentiment);
+    if (!sentiment || sentiment < 1 || sentiment > 5) return;
+
+    const sanitizedComment = (data.comment || '').slice(0, 500).replace(/\n/g, ' ');
+    const context = data.context || {};
+
+    const entry = {
+      type: 'FEEDBACK',
+      timestamp: new Date().toISOString(),
+      sentiment,
+      comment: sanitizedComment || null,
+      sessionId: context.sessionId || null,
+      theme: context.tableTheme || null,
+      playerCount: context.playerCount || null,
+      roundsPlayed: context.roundsPlayed || null,
+      role: context.role || null,
+    };
+
+    console.log(JSON.stringify(entry));
+
+    // Optional webhook forwarding (Discord, Slack, etc.)
+    const webhookUrl = process.env.FEEDBACK_WEBHOOK_URL;
+    if (webhookUrl) {
+      const sentimentEmoji = ['', '\u{1F624}', '\u{1F615}', '\u{1F610}', '\u{1F60A}', '\u{1F60D}'][sentiment];
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: [
+            `**${sentimentEmoji} New Feedback** (${sentiment}/5)`,
+            sanitizedComment ? `> ${sanitizedComment}` : null,
+            `Session: ${context.sessionId || 'landing page'} | Theme: ${context.tableTheme || 'n/a'} | Players: ${context.playerCount || 'n/a'} | Rounds: ${context.roundsPlayed || 'n/a'}`,
+          ].filter(Boolean).join('\n'),
+        }),
+      }).catch((err) => {
+        console.error('[submit-feedback] Webhook error:', err.message);
+      });
+    }
+  });
+
   // --- Disconnect (browser closed, network lost, etc.) ---
   socket.on('disconnect', (reason) => {
     const { sessionId, playerId } = socket.data;

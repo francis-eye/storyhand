@@ -47,6 +47,7 @@ interface GameActions {
   removePlayer: (playerId: string) => void;
   transferHost: (newHostId: string) => void;
   leaveGame: () => void;
+  submitFeedback: (sentiment: number, comment: string) => void;
 }
 
 interface GameContextValue {
@@ -417,6 +418,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, [state, currentPlayerId]);
 
+  const submitFeedback = useCallback((sentiment: number, comment: string) => {
+    const s = ensureConnected();
+    s.emit('submit-feedback', {
+      sentiment,
+      comment: comment || null,
+      context: {
+        sessionId: state?.sessionId || null,
+        tableTheme: state?.settings.tableTheme || null,
+        playerCount: state?.players.length || null,
+        roundsPlayed: state?.currentRound ? state.currentRound - 1 : null,
+        role: currentPlayerId
+          ? state?.players.find(p => p.id === currentPlayerId)?.role || null
+          : null,
+      },
+    });
+  }, [ensureConnected, state, currentPlayerId]);
+
   // ── Context Value ─────────────────────────────────────────────────────────
 
   const actions: GameActions = {
@@ -429,6 +447,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     removePlayer,
     transferHost,
     leaveGame,
+    submitFeedback,
   };
 
   return (
