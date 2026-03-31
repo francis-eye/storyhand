@@ -77,8 +77,8 @@ export interface ThemeConfig {
     barLabel: string;
     barCount: string;
   };
-  // Host controls
-  hostControls: {
+  // Game controls (shared — visible to all players)
+  gameControls: {
     background: string;
     voteCountText: string;
     buttonPrimary: string;
@@ -166,7 +166,7 @@ const classicTheme: ThemeConfig = {
     barLabel: 'text-gray-600',
     barCount: 'text-gray-500',
   },
-  hostControls: {
+  gameControls: {
     background: 'bg-gray-900 text-white',
     voteCountText: 'text-gray-400',
     buttonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white rounded-full',
@@ -253,7 +253,7 @@ const sixteenBitTheme: ThemeConfig = {
     barLabel: 'text-[#33ff33]',
     barCount: 'text-[#33ff33]/70',
   },
-  hostControls: {
+  gameControls: {
     background: 'bg-[#0d0d0d] text-white border-2 border-[#33ff33]/30',
     voteCountText: 'text-[#33ff33]/70',
     buttonPrimary: 'bg-red-800 hover:bg-red-700 text-white border-2 border-red-600 rounded-none',
