@@ -1,5 +1,5 @@
 // User roles in a session
-export type Role = 'host' | 'player' | 'observer';
+export type Role = 'facilitator' | 'player' | 'observer';
 
 // Phases of a voting round
 export type GamePhase = 'waiting' | 'voting' | 'countdown' | 'revealed';
@@ -38,7 +38,7 @@ export interface GameState {
   phase: GamePhase;
   players: Player[];
   currentRound: number;
-  hostId: string;
+  facilitatorId: string;
   isReVoting: boolean;
   countdownValue: number | null;
 }
