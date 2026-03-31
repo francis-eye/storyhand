@@ -6,8 +6,7 @@ import crypto from 'node:crypto';
  * Each session is keyed by a 6-char alphanumeric ID and holds
  * the full game state: settings, phase, players, round counter.
  */
-const DISCONNECT_GRACE_MS = 30 * 1000; // 30 seconds before auto-remove
-const HOST_PROMOTE_DELAY_MS = 5 * 1000; // 5 seconds before auto-promoting new host (allows refresh)
+const DISCONNECT_GRACE_MS = 5 * 60 * 1000; // 5 minutes before auto-remove
 const INACTIVITY_CHECK_INTERVAL_MS = 30 * 1000; // check every 30 seconds
 
 export class SessionManager {
@@ -21,10 +20,6 @@ export class SessionManager {
     // Timers for disconnected player auto-removal: Map<"sessionId:playerId", timeout>
     /** @type {Map<string, ReturnType<typeof setTimeout>>} */
     this.disconnectTimers = new Map();
-
-    // Timers for delayed host promotion: Map<sessionId, timeout>
-    /** @type {Map<string, ReturnType<typeof setTimeout>>} */
-    this.hostPromoteTimers = new Map();
 
     // Callback set by the server to handle auto-removal broadcasts
     /** @type {((sessionId: string, event: string, data: object) => void) | null} */
@@ -53,12 +48,12 @@ export class SessionManager {
 
   createSession(settings, hostName) {
     const sessionId = this.generateSessionId();
-    const hostId = this.generatePlayerId();
+    const facilitatorId = this.generatePlayerId();
 
     const host = {
-      id: hostId,
+      id: facilitatorId,
       name: hostName,
-      role: 'host',
+      role: 'facilitator',
       vote: null,
       hasVoted: false,
       isConnected: true,
@@ -70,9 +65,9 @@ export class SessionManager {
       sessionId,
       settings,
       phase: 'voting',
-      players: new Map([[hostId, host]]),
+      players: new Map([[facilitatorId, host]]),
       currentRound: 1,
-      hostId,
+      facilitatorId,
       isReVoting: false,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
@@ -83,7 +78,7 @@ export class SessionManager {
     this.checkStatsReset();
     this.stats.sessionsCreated++;
 
-    return { sessionId, hostId, gameState: this.getGameState(sessionId) };
+    return { sessionId, facilitatorId, gameState: this.getGameState(sessionId) };
   }
 
   joinSession(sessionId, role, name, socketId) {
@@ -131,7 +126,7 @@ export class SessionManager {
 
     const player = session.players.get(playerId);
     if (!player) return { error: 'Player not found' };
-    if (player.role !== 'player' && player.role !== 'host') return { error: 'Only players and hosts can vote' };
+    if (player.role !== 'player' && player.role !== 'facilitator') return { error: 'Only players and facilitators can vote' };
 
     // null value = unplay (deselect) the card
     if (value === null) {
@@ -143,13 +138,39 @@ export class SessionManager {
     }
     session.lastActivityAt = Date.now();
 
-    return { playerId, hasVoted: player.hasVoted };
+    const autoRevealResult = this.checkAutoReveal(session);
+    return { playerId, hasVoted: player.hasVoted, autoReveal: autoRevealResult };
   }
 
-  revealCards(sessionId, requesterId) {
+  checkAutoReveal(session) {
+    if (session.phase !== 'voting') return null;
+
+    const activePlayers = Array.from(session.players.values()).filter(
+      p => (p.role === 'player' || p.role === 'facilitator') && p.isConnected
+    );
+    const allVoted = activePlayers.length > 0 && activePlayers.every(p => p.hasVoted);
+
+    if (!allVoted) return null;
+
+    session.phase = 'revealed';
+    session.lastActivityAt = Date.now();
+
+    const players = Array.from(session.players.values()).map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role,
+      vote: p.vote,
+      hasVoted: p.hasVoted,
+      isConnected: p.isConnected,
+      disconnectedAt: p.disconnectedAt,
+    }));
+
+    return { players };
+  }
+
+  revealCards(sessionId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
-    if (session.hostId !== requesterId) return { error: 'Only the host can reveal' };
 
     session.phase = 'revealed';
     session.lastActivityAt = Date.now();
@@ -168,10 +189,9 @@ export class SessionManager {
     return { players };
   }
 
-  newRound(sessionId, requesterId) {
+  newRound(sessionId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
-    if (session.hostId !== requesterId) return { error: 'Only the host can start a new round' };
 
     session.currentRound += 1;
     this.resetVotes(session);
@@ -182,10 +202,9 @@ export class SessionManager {
     return { currentRound: session.currentRound, isReVote: false };
   }
 
-  reVote(sessionId, requesterId) {
+  reVote(sessionId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
-    if (session.hostId !== requesterId) return { error: 'Only the host can trigger re-vote' };
 
     this.resetVotes(session);
     session.isReVoting = true; // flag stays until next newRound or reveal
@@ -206,56 +225,15 @@ export class SessionManager {
 
   disconnectPlayer(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
-    if (!session) {
-      console.log(`[disconnectPlayer] Session ${sessionId} not found`);
-      return null;
-    }
+    if (!session) return null;
 
     const player = session.players.get(playerId);
-    if (!player) {
-      console.log(`[disconnectPlayer] Player ${playerId} not found in session ${sessionId}`);
-      return null;
-    }
+    if (!player) return null;
 
-    console.log(`[disconnectPlayer] Marking ${player.name} (${playerId}) as disconnected. socketId was: ${player.socketId}`);
+    console.log(`[disconnectPlayer] Marking ${player.name} (${playerId}) as disconnected`);
     player.isConnected = false;
     player.disconnectedAt = Date.now();
 
-    // Host disconnect: delay promotion by 5 seconds so page refreshes don't lose host role.
-    // If the host reconnects within 5s, the timer is cancelled and they keep their role.
-    if (player.role === 'host') {
-      // Cancel any existing promote timer for this session
-      if (this.hostPromoteTimers.has(sessionId)) {
-        clearTimeout(this.hostPromoteTimers.get(sessionId));
-      }
-
-      const promoteTimer = setTimeout(() => {
-        this.hostPromoteTimers.delete(sessionId);
-        const promoted = this.immediateHostPromote(sessionId, playerId);
-        if (promoted && this.onBroadcast) {
-          this.onBroadcast(sessionId, 'host-transferred', {
-            oldHostId: playerId,
-            newHostId: promoted.newHostId,
-          });
-        }
-      }, HOST_PROMOTE_DELAY_MS);
-      this.hostPromoteTimers.set(sessionId, promoteTimer);
-
-      // Start 2-min grace period to auto-remove the disconnected host
-      const timerKey = `${sessionId}:${playerId}`;
-      if (this.disconnectTimers.has(timerKey)) {
-        clearTimeout(this.disconnectTimers.get(timerKey));
-      }
-      const timer = setTimeout(() => {
-        this.disconnectTimers.delete(timerKey);
-        this.autoRemovePlayer(sessionId, playerId);
-      }, DISCONNECT_GRACE_MS);
-      this.disconnectTimers.set(timerKey, timer);
-
-      return { playerId };
-    }
-
-    // Non-host: standard 2-minute grace period before auto-removal
     const timerKey = `${sessionId}:${playerId}`;
     if (this.disconnectTimers.has(timerKey)) {
       clearTimeout(this.disconnectTimers.get(timerKey));
@@ -265,6 +243,12 @@ export class SessionManager {
       this.autoRemovePlayer(sessionId, playerId);
     }, DISCONNECT_GRACE_MS);
     this.disconnectTimers.set(timerKey, timer);
+
+    // Check auto-reveal: disconnected player excluded from threshold
+    const autoRevealResult = this.checkAutoReveal(session);
+    if (autoRevealResult && this.onBroadcast) {
+      this.onBroadcast(sessionId, 'cards-revealed', { players: autoRevealResult.players });
+    }
 
     return { playerId };
   }
@@ -287,17 +271,10 @@ export class SessionManager {
       this.disconnectTimers.delete(timerKey);
     }
 
-    // Cancel the delayed host promotion if the host is reconnecting
-    if (player.role === 'host' && this.hostPromoteTimers.has(sessionId)) {
-      clearTimeout(this.hostPromoteTimers.get(sessionId));
-      this.hostPromoteTimers.delete(sessionId);
-      console.log(`Host ${player.name} reconnected before promotion timer — keeping host role`);
-    }
-
     return { playerId };
   }
 
-  // Called automatically after disconnect grace period (30s)
+  // Called automatically after disconnect grace period (5 min)
   autoRemovePlayer(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -324,54 +301,55 @@ export class SessionManager {
     }
   }
 
-  // Called immediately when host disconnects — demotes them to player and promotes another
-  // Returns { newHostId } if promotion succeeded, null if no one available
-  immediateHostPromote(sessionId, hostPlayerId) {
-    const session = this.sessions.get(sessionId);
-    if (!session) return null;
-
-    const nextHost = Array.from(session.players.values()).find(
-      p => p.id !== hostPlayerId && p.role === 'player' && p.isConnected
-    );
-
-    if (!nextHost) return null;
-
-    // Demote old host to player (they stay in session for reconnect)
-    const oldHost = session.players.get(hostPlayerId);
-    oldHost.role = 'player';
-
-    // Promote new host
-    nextHost.role = 'host';
-    session.hostId = nextHost.id;
-    console.log(`Immediately promoted ${nextHost.name} (${nextHost.id}) to host in session ${sessionId} after host disconnect`);
-
-    return { newHostId: nextHost.id };
-  }
-
   leaveSession(sessionId, playerId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
 
-    if (session.hostId === playerId) {
-      // Try to promote another connected player before destroying
-      const nextHost = Array.from(session.players.values()).find(
-        p => p.id !== playerId && p.role === 'player' && p.isConnected
-      );
+    session.players.delete(playerId);
 
-      if (nextHost) {
-        session.players.delete(playerId);
-        nextHost.role = 'host';
-        session.hostId = nextHost.id;
-        return { playerId, sessionDestroyed: false, newHostId: nextHost.id };
-      }
-
-      // No one to promote — destroy
+    if (session.players.size === 0) {
       this.sessions.delete(sessionId);
       return { playerId, sessionDestroyed: true };
     }
 
-    session.players.delete(playerId);
     return { playerId, sessionDestroyed: false };
+  }
+
+  kickPlayer(sessionId, requesterId, targetPlayerId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.facilitatorId !== requesterId) return { error: 'Only the facilitator can kick players' };
+    if (requesterId === targetPlayerId) return { error: 'Cannot kick yourself' };
+
+    const target = session.players.get(targetPlayerId);
+    if (!target) return { error: 'Player not found' };
+
+    session.players.delete(targetPlayerId);
+
+    const timerKey = `${sessionId}:${targetPlayerId}`;
+    if (this.disconnectTimers.has(timerKey)) {
+      clearTimeout(this.disconnectTimers.get(timerKey));
+      this.disconnectTimers.delete(timerKey);
+    }
+
+    const autoRevealResult = this.checkAutoReveal(session);
+    return { playerId: targetPlayerId, autoReveal: autoRevealResult };
+  }
+
+  endSession(sessionId, requesterId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return { error: 'Session not found' };
+    if (session.facilitatorId !== requesterId) return { error: 'Only the facilitator can end the session' };
+
+    for (const [key, timer] of this.disconnectTimers) {
+      if (key.startsWith(`${sessionId}:`)) {
+        clearTimeout(timer);
+        this.disconnectTimers.delete(key);
+      }
+    }
+
+    this.sessions.delete(sessionId);
+    return { sessionDestroyed: true };
   }
 
   // --- State queries ---
@@ -395,7 +373,7 @@ export class SessionManager {
       phase: session.phase,
       players,
       currentRound: session.currentRound,
-      hostId: session.hostId,
+      facilitatorId: session.facilitatorId,
       isReVoting: session.isReVoting,
       countdownValue: null, // countdown is client-side only
     };
@@ -435,12 +413,6 @@ export class SessionManager {
           }
         }
 
-        // Clean up host promote timer
-        if (this.hostPromoteTimers.has(sessionId)) {
-          clearTimeout(this.hostPromoteTimers.get(sessionId));
-          this.hostPromoteTimers.delete(sessionId);
-        }
-
         if (this.onBroadcast) {
           this.onBroadcast(sessionId, 'session-expired', {});
         }
@@ -465,26 +437,6 @@ export class SessionManager {
   getStats() {
     this.checkStatsReset();
     return { ...this.stats, activeSessions: this.sessions.size };
-  }
-
-  // --- Host transfer ---
-
-  transferHost(sessionId, requesterId, newHostId) {
-    const session = this.sessions.get(sessionId);
-    if (!session) return { error: 'Session not found' };
-    if (session.hostId !== requesterId) return { error: 'Only the host can transfer' };
-
-    const newHost = session.players.get(newHostId);
-    if (!newHost) return { error: 'Player not found' };
-    if (newHost.role !== 'player') return { error: 'Can only transfer to a player' };
-
-    const oldHost = session.players.get(requesterId);
-    oldHost.role = 'player';
-    newHost.role = 'host';
-    session.hostId = newHostId;
-    session.lastActivityAt = Date.now();
-
-    return { oldHostId: requesterId, newHostId };
   }
 
   // --- Helpers ---
