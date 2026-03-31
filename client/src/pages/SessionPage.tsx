@@ -4,7 +4,7 @@ import SessionHeader from '../components/SessionHeader';
 import PlayerRoster from '../components/PlayerRoster';
 import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
-import HostControls from '../components/HostControls';
+import GameControls from '../components/GameControls';
 import { canVote } from '../utils/session';
 import { getTheme } from '../themes/themeRegistry';
 import Footer from '../components/Footer';
@@ -46,6 +46,9 @@ export default function SessionPage() {
   const isVotingPhase = state.phase === 'voting';
   const playerCount = state.players.filter(p => canVote(p)).length;
   const votedCount = state.players.filter(p => canVote(p) && p.hasVoted).length;
+  const unvotedPlayerNames = state.players
+    .filter(p => canVote(p) && !p.hasVoted && p.isConnected)
+    .map(p => p.name);
 
   return (
     <div className={`flex flex-col h-[calc(100vh-65px)] ${theme.wrapper}`}>
@@ -81,9 +84,9 @@ export default function SessionPage() {
             theme={theme}
           />
 
-          {/* Host controls — in-flow on mobile, floating on desktop */}
+          {/* Game controls — in-flow on mobile, floating on desktop */}
           {isHost && (
-            <HostControls
+            <GameControls
               phase={state.phase}
               onReveal={actions.revealCards}
               onReVote={actions.reVote}
@@ -91,6 +94,7 @@ export default function SessionPage() {
               votedCount={votedCount}
               totalPlayers={playerCount}
               countdownValue={state.countdownValue}
+              unvotedPlayerNames={unvotedPlayerNames}
               theme={theme}
             />
           )}
