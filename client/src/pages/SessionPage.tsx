@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import SessionHeader from '../components/SessionHeader';
-import PlayerRoster from '../components/PlayerRoster';
+import PlayerBar from '../components/PlayerBar';
 import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
 import GameControls from '../components/GameControls';
@@ -76,54 +76,51 @@ export default function SessionPage() {
         theme={theme}
       />
 
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-        {/* Roster: horizontal bar on mobile, sidebar on desktop */}
-        <PlayerRoster
+      {/* Player bar — replaces sidebar roster */}
+      <PlayerBar
+        players={state.players}
+        facilitatorId={state.facilitatorId}
+        showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
+        isCurrentUserFacilitator={isFacilitator}
+        onKickPlayer={actions.kickPlayer}
+        theme={theme}
+      />
+
+      {/* Game table — takes all remaining vertical space */}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <GameTable
           players={state.players}
-          facilitatorId={state.facilitatorId}
-          showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
-          isCurrentUserFacilitator={isFacilitator}
-          onKickPlayer={actions.kickPlayer}
+          phase={state.phase}
+          showAverage={state.settings.showAverage}
+          countdownValue={state.countdownValue}
           theme={theme}
         />
-
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Game table */}
-          <GameTable
-            players={state.players}
-            phase={state.phase}
-            showAverage={state.settings.showAverage}
-            countdownValue={state.countdownValue}
-            theme={theme}
-          />
-
-          {/* Game controls — in-flow on mobile, floating on desktop */}
-          {canVoteInSession && (
-            <GameControls
-              phase={state.phase}
-              onReveal={actions.revealCards}
-              onReVote={actions.reVote}
-              onNewRound={actions.startNewRound}
-              votedCount={votedCount}
-              totalPlayers={playerCount}
-              countdownValue={state.countdownValue}
-              unvotedPlayerNames={unvotedPlayerNames}
-              theme={theme}
-            />
-          )}
-
-          {/* Card deck for voters (host + players) */}
-          {canVoteInSession && (
-            <CardDeck
-              selectedValue={selectedCard}
-              onSelect={actions.playCard}
-              disabled={!isVotingPhase}
-              theme={theme}
-            />
-          )}
-        </div>
       </div>
+
+      {/* Game controls — visible to all voters */}
+      {canVoteInSession && (
+        <GameControls
+          phase={state.phase}
+          onReveal={actions.revealCards}
+          onReVote={actions.reVote}
+          onNewRound={actions.startNewRound}
+          votedCount={votedCount}
+          totalPlayers={playerCount}
+          countdownValue={state.countdownValue}
+          unvotedPlayerNames={unvotedPlayerNames}
+          theme={theme}
+        />
+      )}
+
+      {/* Card deck for voters (host + players) */}
+      {canVoteInSession && (
+        <CardDeck
+          selectedValue={selectedCard}
+          onSelect={actions.playCard}
+          disabled={!isVotingPhase}
+          theme={theme}
+        />
+      )}
     </div>
   );
 }
