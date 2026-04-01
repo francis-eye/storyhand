@@ -1,5 +1,6 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,900;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
 
 /* 16-bit pixel font utility */
 .font-pixel {
@@ -39,4 +40,18 @@
 /* Retro glow on key elements */
 .theme-16bit-glow {
   text-shadow: 0 0 8px rgba(255, 165, 0, 0.6), 0 0 16px rgba(255, 165, 0, 0.3);
+}
+
+/* Homepage fonts */
+.font-dm-sans {
+  font-family: 'DM Sans', sans-serif;
+}
+.font-space-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Homepage card deal animation */
+@keyframes dealCard {
+  from { transform: translateY(-20px) scale(0.8); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
 }
