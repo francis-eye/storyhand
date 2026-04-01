@@ -1,5 +1,7 @@
 import type { CardValue } from '../types/game';
 import type { ThemeConfig } from '../themes/themeRegistry';
+import { getCardColor } from '../utils/session';
+import { useColorMode } from '../hooks/useColorMode';
 
 interface PlayingCardProps {
   value: CardValue;
@@ -27,7 +29,9 @@ export default function PlayingCard({
     large: 'w-20 h-30 text-lg',
   };
 
+  const { isDark } = useColorMode();
   const displayValue = String(value);
+  const cardColor = getCardColor(value, isDark && theme?.id !== '16bit');
 
   // Theme-aware classes with fallbacks to classic
   const rounded = theme?.card.rounded ?? 'rounded-lg';
@@ -35,8 +39,6 @@ export default function PlayingCard({
   const faceUpBorder = theme?.card.faceUpBorder ?? 'border-gray-300';
   const faceUpSelectedBorder = theme?.card.faceUpSelectedBorder ?? 'border-blue-600 ring-2 ring-blue-300';
   const faceUpHoverBorder = theme?.card.faceUpHoverBorder ?? 'hover:border-blue-400';
-  const faceUpText = theme?.card.faceUpText ?? 'text-gray-800';
-  const faceUpCornerText = theme?.card.faceUpCornerText ?? 'text-gray-600';
   const faceDownBg = theme?.card.faceDownBg ?? 'linear-gradient(135deg, #4f46e5, #7c3aed)';
   const faceDownBorder = theme?.card.faceDownBorder ?? 'border-gray-400 rounded-lg';
   const faceDownInner = theme?.card.faceDownInner ?? 'border-white/30 rounded-sm';
@@ -62,11 +64,11 @@ export default function PlayingCard({
             transition-all`}
           style={{ backfaceVisibility: 'hidden' }}
         >
-          <span className={`absolute top-1 left-1.5 text-[10px] font-semibold ${faceUpCornerText}`}>
+          <span className="absolute top-1 left-1.5 text-[10px] font-semibold" style={{ color: cardColor }}>
             {displayValue}
           </span>
-          <span className={`font-bold ${faceUpText}`}>{displayValue}</span>
-          <span className={`absolute bottom-1 right-1.5 text-[10px] font-semibold ${faceUpCornerText} rotate-180`}>
+          <span className="font-bold" style={{ color: cardColor }}>{displayValue}</span>
+          <span className="absolute bottom-1 right-1.5 text-[10px] font-semibold rotate-180" style={{ color: cardColor }}>
             {displayValue}
           </span>
         </div>

@@ -130,8 +130,26 @@ const CARD_COLORS: Record<string, string> = {
   '☕': '#4E342E',
 };
 
-export function getCardColor(value: number | '?' | '☕'): string {
-  return CARD_COLORS[String(value)] || '#374151';
+// Lighter variants for dark card faces
+const CARD_COLORS_DARK: Record<string, string> = {
+  '0': '#66BB6A',
+  '1': '#81C784',
+  '2': '#9CCC65',
+  '3': '#D4E157',
+  '5': '#FFEE58',
+  '8': '#FFA726',
+  '13': '#FF7043',
+  '21': '#EF5350',
+  '34': '#EC407A',
+  '55': '#AB47BC',
+  '89': '#7E57C2',
+  '?': '#90A4AE',
+  '☕': '#A1887F',
+};
+
+export function getCardColor(value: number | '?' | '☕', isDark = false): string {
+  const colors = isDark ? CARD_COLORS_DARK : CARD_COLORS;
+  return colors[String(value)] || '#374151';
 }
 
 // Generate a deterministic color from a string (for avatar backgrounds)
