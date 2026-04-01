@@ -77,8 +77,10 @@ export default function CreateGamePage() {
               value={hostName}
               onChange={e => setHostName(e.target.value)}
               placeholder="Scrum Master Steve"
+              maxLength={20}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-[var(--input-bg)] dark:border-[var(--input-border)] dark:text-[var(--text-primary)]"
             />
+            <p className="text-xs text-gray-400 mt-1 text-right">{hostName.length}/20</p>
           </div>
 
           {/* Voting system (locked to Fibonacci for now) */}

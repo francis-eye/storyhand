@@ -51,7 +51,8 @@ io.on('connection', (socket) => {
 
   // --- Create a new session ---
   socket.on('create-session', ({ settings, hostName }, callback) => {
-    const result = sessionManager.createSession(settings, hostName);
+    const sanitizedName = (hostName || '').slice(0, 20);
+    const result = sessionManager.createSession(settings, sanitizedName);
 
     // Store session/player info on the socket for disconnect handling
     socket.data.sessionId = result.sessionId;
@@ -75,7 +76,8 @@ io.on('connection', (socket) => {
     // the player already exists (e.g., polling→websocket transport upgrade).
     socket.join(sessionId);
 
-    const result = sessionManager.joinSession(sessionId, role, name, socket.id);
+    const sanitizedName = name ? name.slice(0, 20) : name;
+    const result = sessionManager.joinSession(sessionId, role, sanitizedName, socket.id);
 
     if (result.error) {
       callback({ success: false, error: result.error });
