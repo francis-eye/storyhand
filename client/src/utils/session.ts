@@ -1,6 +1,86 @@
-// Check if a player can vote (host and player roles)
+// Check if a player can vote (facilitator and player roles)
 export function canVote(player: { role: string }): boolean {
   return player.role === 'facilitator' || player.role === 'player';
+}
+
+// ── Dual Storage (sessionStorage + localStorage fallback) ─────────────────────
+// Safari clears sessionStorage on tab close. localStorage with TTL provides
+// a fallback so players can reconnect after reopening the tab.
+
+const SESSION_KEY = 'storyhand_session';
+const TTL_MS = 300000; // 5 minutes — matches disconnect grace period
+
+interface StoredSession {
+  sessionId: string;
+  playerId: string;
+  timestamp: number;
+}
+
+/**
+ * Read stored session identity.
+ * Checks sessionStorage first (works on Chrome tab restore).
+ * Falls back to localStorage with TTL check (covers Safari tab close).
+ */
+export function getStoredSession(): StoredSession | null {
+  try {
+    const fromSession = sessionStorage.getItem(SESSION_KEY);
+    if (fromSession) {
+      return JSON.parse(fromSession);
+    }
+
+    const fromLocal = localStorage.getItem(SESSION_KEY);
+    if (fromLocal) {
+      const data: StoredSession = JSON.parse(fromLocal);
+      if (Date.now() - data.timestamp < TTL_MS) {
+        // Valid — also restore to sessionStorage for subsequent checks
+        sessionStorage.setItem(SESSION_KEY, fromLocal);
+        return data;
+      }
+      localStorage.removeItem(SESSION_KEY);
+    }
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
+  }
+  return null;
+}
+
+/**
+ * Store session identity in both storage mechanisms.
+ * Call after successful create-session or join-session.
+ */
+export function storeSession(sessionId: string, playerId: string): void {
+  const data = JSON.stringify({ sessionId, playerId, timestamp: Date.now() });
+  sessionStorage.setItem(SESSION_KEY, data);
+  localStorage.setItem(SESSION_KEY, data);
+}
+
+/**
+ * Refresh the timestamp to prevent TTL expiry during active sessions.
+ * Call on meaningful interactions (play card, new round, etc.).
+ */
+export function refreshSessionTimestamp(): void {
+  try {
+    const fromSession = sessionStorage.getItem(SESSION_KEY);
+    if (fromSession) {
+      const data: StoredSession = JSON.parse(fromSession);
+      data.timestamp = Date.now();
+      const updated = JSON.stringify(data);
+      sessionStorage.setItem(SESSION_KEY, updated);
+      localStorage.setItem(SESSION_KEY, updated);
+    }
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Clear session identity from both storage mechanisms.
+ * Call on explicit leave/exit AND on failed reconnect.
+ */
+export function clearStoredSession(): void {
+  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
 }
 
 // Generate a 6-character alphanumeric session ID
