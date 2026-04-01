@@ -9,10 +9,11 @@ interface SessionHeaderProps {
   phase: GamePhase;
   isReVoting?: boolean;
   theme: ThemeConfig;
+  consensusStreak?: number;
 }
 
 // Session info bar: game name, round counter, phase chip, invite link + session ID
-export default function SessionHeader({ gameName, sessionId, currentRound, phase, isReVoting, theme }: SessionHeaderProps) {
+export default function SessionHeader({ gameName, sessionId, currentRound, phase, isReVoting, theme, consensusStreak }: SessionHeaderProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const phaseClasses = theme.header.phaseChip[phase] || '';
@@ -52,6 +53,19 @@ export default function SessionHeader({ gameName, sessionId, currentRound, phase
           <span className={`text-sm ${roundColor}`}>·</span>
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium animate-pulse ${theme.header.reVotingChip}`}>
             Re-voting...
+          </span>
+        </>
+      )}
+
+      {consensusStreak && consensusStreak >= 2 && (
+        <>
+          <span className={`text-sm ${roundColor}`}>·</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+            theme.id === '16bit'
+              ? 'bg-orange-900 text-orange-300 border border-orange-500'
+              : 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+          }`}>
+            {'\u{1F525}'} {consensusStreak}
           </span>
         </>
       )}

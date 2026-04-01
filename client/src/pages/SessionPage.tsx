@@ -8,11 +8,13 @@ import GameControls from '../components/GameControls';
 import { canVote } from '../utils/session';
 import { getTheme } from '../themes/themeRegistry';
 import Footer from '../components/Footer';
+import AchievementToast from '../components/AchievementToast';
+import SessionSummaryCard from '../components/SessionSummaryCard';
 
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
   const navigate = useNavigate();
-  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds } = useGameState();
+  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, clearSessionSummary } = useGameState();
 
   // While reconnecting after page refresh, show a loading state instead of flashing "No active session"
   if (isReconnecting) {
@@ -74,6 +76,7 @@ export default function SessionPage() {
         phase={state.phase}
         isReVoting={state.isReVoting}
         theme={theme}
+        consensusStreak={state.consensusStreak}
       />
 
       {/* Player bar — replaces sidebar roster */}
@@ -87,7 +90,7 @@ export default function SessionPage() {
       />
 
       {/* Game table — takes all remaining vertical space */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto relative">
         <GameTable
           players={state.players}
           phase={state.phase}
@@ -95,6 +98,9 @@ export default function SessionPage() {
           countdownValue={state.countdownValue}
           theme={theme}
         />
+        {currentAchievement && (
+          <AchievementToast achievement={currentAchievement} theme={theme} />
+        )}
       </div>
 
       {/* Game controls — visible to all voters */}
@@ -119,6 +125,16 @@ export default function SessionPage() {
           onSelect={actions.playCard}
           disabled={!isVotingPhase}
           theme={theme}
+        />
+      )}
+
+      {sessionSummary && (
+        <SessionSummaryCard
+          summary={sessionSummary}
+          onDone={() => {
+            clearSessionSummary();
+            navigate('/');
+          }}
         />
       )}
     </div>
