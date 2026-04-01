@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useRef, useEffect, ty
 import { io } from 'socket.io-client';
 import type { GameState, Player, Role, CardValue, GamePhase } from '../types/game';
 import type { GameSettings } from '../types/game';
+import { getStoredSession, storeSession, clearStoredSession, refreshSessionTimestamp } from '../utils/session';
 
 // ── Module-scope singleton ────────────────────────────────────────────────────
 // Exactly one socket per browser tab, created once at import time.
@@ -73,11 +74,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(() => {
     // Start as true if we have stored session info and URL matches — prevents flash
-    const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
-    const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
-    if (!storedSessionId || !storedPlayerId) return false;
+    const stored = getStoredSession();
+    if (!stored) return false;
     const pathMatch = window.location.pathname.match(/^\/session\/(.+)$/);
-    return !!(pathMatch && pathMatch[1] === storedSessionId);
+    return !!(pathMatch && pathMatch[1] === stored.sessionId);
   });
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
@@ -219,8 +219,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setState(null);
       setCurrentPlayerId(null);
       setSelectedCard(null);
-      sessionStorage.removeItem('storyhand-sessionId');
-      sessionStorage.removeItem('storyhand-playerId');
+      clearStoredSession();
       setError('Session has ended.');
     });
 
@@ -230,21 +229,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
     // - Page refresh (sessionStorage has session info)
     // The server's reconnect-session handler is idempotent.
     socket.on('connect', () => {
-      const sessionId = sessionStorage.getItem('storyhand-sessionId');
-      const playerId = sessionStorage.getItem('storyhand-playerId');
-      if (!sessionId || !playerId) return;
+      const stored = getStoredSession();
+      if (!stored) return;
 
       socket.emit(
         'reconnect-session',
-        { sessionId, playerId },
+        { sessionId: stored.sessionId, playerId: stored.playerId },
         (response: SocketResponse<ReconnectSessionData>) => {
           if (response.success && response.data) {
             setState(response.data.gameState);
-            setCurrentPlayerId(playerId);
+            setCurrentPlayerId(stored.playerId);
+            storeSession(stored.sessionId, stored.playerId); // Refresh timestamp
           } else {
-            // Session no longer exists on server
-            sessionStorage.removeItem('storyhand-sessionId');
-            sessionStorage.removeItem('storyhand-playerId');
+            clearStoredSession();
           }
           setIsReconnecting(false);
         }
@@ -271,19 +268,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // The 'connect' handler above will automatically emit reconnect-session.
 
   useEffect(() => {
-    const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
-    const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
+    const stored = getStoredSession();
 
-    if (!storedSessionId || !storedPlayerId) {
+    if (!stored) {
       setIsReconnecting(false);
       return;
     }
 
     // Only reconnect if URL matches the stored session
     const pathMatch = window.location.pathname.match(/^\/session\/(.+)$/);
-    if (!pathMatch || pathMatch[1] !== storedSessionId) {
-      sessionStorage.removeItem('storyhand-sessionId');
-      sessionStorage.removeItem('storyhand-playerId');
+    if (!pathMatch || pathMatch[1] !== stored.sessionId) {
+      clearStoredSession();
       setIsReconnecting(false);
       return;
     }
@@ -300,9 +295,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
 
-      const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
-      const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
-      if (!storedSessionId || !storedPlayerId) return;
+      const stored = getStoredSession();
+      if (!stored) return;
 
       if (socket.connected && gameStateRef.current) return;
 
@@ -312,19 +306,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       socket.emit(
         'reconnect-session',
-        { sessionId: storedSessionId, playerId: storedPlayerId },
+        { sessionId: stored.sessionId, playerId: stored.playerId },
         (response: any) => {
           if (response.error || !response.success || !response.data) {
-            sessionStorage.removeItem('storyhand-sessionId');
-            sessionStorage.removeItem('storyhand-playerId');
+            clearStoredSession();
           } else {
+            storeSession(stored.sessionId, stored.playerId); // Refresh timestamp
             const prevRound = gameStateRef.current?.currentRound;
             setState(response.data.gameState);
             const currentPlayer = response.data.gameState.players.find(
-              (p: any) => p.id === storedPlayerId
+              (p: any) => p.id === stored.playerId
             );
             if (currentPlayer) {
-              setCurrentPlayerId(storedPlayerId);
+              setCurrentPlayerId(stored.playerId);
             }
             if (prevRound && response.data.gameState.currentRound > prevRound) {
               setMissedRounds(response.data.gameState.currentRound - prevRound);
@@ -358,8 +352,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const { sessionId, facilitatorId, gameState } = response.data;
         setState(gameState);
         setCurrentPlayerId(facilitatorId);
-        sessionStorage.setItem('storyhand-sessionId', sessionId);
-        sessionStorage.setItem('storyhand-playerId', facilitatorId);
+        storeSession(sessionId, facilitatorId);
         resolve(sessionId);
       });
     });
@@ -381,8 +374,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         const { playerId, gameState } = response.data;
         setState(gameState);
         setCurrentPlayerId(playerId);
-        sessionStorage.setItem('storyhand-sessionId', sessionId);
-        sessionStorage.setItem('storyhand-playerId', playerId);
+        storeSession(sessionId, playerId);
         resolve();
       });
     });
@@ -400,6 +392,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       playerId: currentPlayerId,
       value: newValue,
     });
+    refreshSessionTimestamp();
   }, [state, currentPlayerId, selectedCard]);
 
   const revealCards = useCallback(() => {
@@ -410,11 +403,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const startNewRound = useCallback(() => {
     if (!state) return;
     socket.emit('new-round', { sessionId: state.sessionId });
+    refreshSessionTimestamp();
   }, [state]);
 
   const reVote = useCallback(() => {
     if (!state) return;
     socket.emit('re-vote', { sessionId: state.sessionId });
+    refreshSessionTimestamp();
   }, [state]);
 
   const kickPlayer = useCallback((targetPlayerId: string) => {
@@ -428,8 +423,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(() => {
     if (!state) return;
     socket.emit('end-session', { sessionId: state.sessionId }, () => {
-      sessionStorage.removeItem('storyhand-sessionId');
-      sessionStorage.removeItem('storyhand-playerId');
+      clearStoredSession();
       setState(null);
       setCurrentPlayerId(null);
       setSelectedCard(null);
@@ -445,8 +439,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const leaveGame = useCallback(() => {
-    sessionStorage.removeItem('storyhand-sessionId');
-    sessionStorage.removeItem('storyhand-playerId');
+    clearStoredSession();
 
     if (state && currentPlayerId && socket.connected) {
       socket.emit(
