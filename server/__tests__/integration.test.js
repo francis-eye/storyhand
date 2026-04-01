@@ -55,8 +55,8 @@ beforeAll(async () => {
     socket.on('create-session', ({ settings, hostName }, callback) => {
       const result = sessionManager.createSession(settings, hostName);
       socket.data.sessionId = result.sessionId;
-      socket.data.playerId = result.hostId;
-      sessionManager.setSocketId(result.sessionId, result.hostId, socket.id);
+      socket.data.playerId = result.facilitatorId;
+      sessionManager.setSocketId(result.sessionId, result.facilitatorId, socket.id);
       socket.join(result.sessionId);
       callback({ success: true, data: result });
     });
@@ -92,30 +92,27 @@ beforeAll(async () => {
       const result = sessionManager.playCard(sessionId, playerId, value);
       if (result.error) return;
       ioServer.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
+      if (result.autoReveal) {
+        ioServer.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players });
+      }
     });
 
     socket.on('reveal-cards', ({ sessionId }) => {
-      const result = sessionManager.revealCards(sessionId, socket.data.playerId);
+      const result = sessionManager.revealCards(sessionId);
       if (result.error) return;
       ioServer.to(sessionId).emit('cards-revealed', { players: result.players });
     });
 
     socket.on('new-round', ({ sessionId }) => {
-      const result = sessionManager.newRound(sessionId, socket.data.playerId);
+      const result = sessionManager.newRound(sessionId);
       if (result.error) return;
       ioServer.to(sessionId).emit('round-reset', { currentRound: result.currentRound, isReVote: false });
     });
 
     socket.on('re-vote', ({ sessionId }) => {
-      const result = sessionManager.reVote(sessionId, socket.data.playerId);
+      const result = sessionManager.reVote(sessionId);
       if (result.error) return;
       ioServer.to(sessionId).emit('round-reset', { currentRound: result.currentRound, isReVote: true });
-    });
-
-    socket.on('transfer-host', ({ sessionId, newHostId }) => {
-      const result = sessionManager.transferHost(sessionId, socket.data.playerId, newHostId);
-      if (result.error) return;
-      ioServer.to(sessionId).emit('host-transferred', { oldHostId: result.oldHostId, newHostId: result.newHostId });
     });
 
     socket.on('leave-session', ({ sessionId, playerId }, callback) => {
@@ -132,9 +129,6 @@ beforeAll(async () => {
         ioServer.to(sessionId).emit('session-expired', {});
       } else {
         ioServer.to(sessionId).emit('player-left', { playerId });
-        if (result.newHostId) {
-          ioServer.to(sessionId).emit('host-transferred', { oldHostId: playerId, newHostId: result.newHostId });
-        }
       }
       if (typeof callback === 'function') callback({ success: true });
     });
@@ -145,7 +139,6 @@ beforeAll(async () => {
       const result = sessionManager.disconnectPlayer(sessionId, playerId);
       if (result) {
         ioServer.to(sessionId).emit('player-disconnected', { playerId });
-        // Host promotion is now delayed (5s) and broadcast via onBroadcast callback
       }
     });
   });
@@ -164,9 +157,6 @@ afterEach(() => {
 afterAll(async () => {
   clearInterval(sessionManager.inactivityInterval);
   for (const timer of sessionManager.disconnectTimers.values()) {
-    clearTimeout(timer);
-  }
-  for (const timer of sessionManager.hostPromoteTimers.values()) {
     clearTimeout(timer);
   }
   ioServer.close();
@@ -202,7 +192,7 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const joinResult = await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
@@ -213,7 +203,7 @@ describe('Socket.IO Integration Tests', () => {
     playerSocket.emit('play-card', { sessionId, playerId, value: 8 });
     await waitForEvent(hostSocket, 'card-played');
 
-    hostSocket.emit('play-card', { sessionId, playerId: hostId, value: 5 });
+    hostSocket.emit('play-card', { sessionId, playerId: facilitatorId, value: 5 });
     await waitForEvent(playerSocket, 'card-played');
 
     // Host reveals
@@ -222,53 +212,65 @@ describe('Socket.IO Integration Tests', () => {
     const revealed = await revealPromise;
 
     const bob = revealed.players.find((p) => p.id === playerId);
-    const alice = revealed.players.find((p) => p.id === hostId);
+    const alice = revealed.players.find((p) => p.id === facilitatorId);
     expect(bob.vote).toBe(8);
     expect(alice.vote).toBe(5);
   });
 
-  it('host disconnect triggers delayed auto-promote after 5s', async () => {
+  it('facilitator disconnect is treated same as any player — no auto-promote', async () => {
     const hostSocket = createSocket();
     const playerSocket = createSocket();
 
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
     );
-    const sessionId = createResult.data.sessionId;
+    const { sessionId, facilitatorId } = createResult.data;
 
     await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
     );
 
-    const transferPromise = waitForEvent(playerSocket, 'host-transferred', 8000);
+    // Listen for player-disconnected (should fire), but NOT host-transferred
+    const disconnectPromise = waitForEvent(playerSocket, 'player-disconnected');
     hostSocket.disconnect();
 
-    const transfer = await transferPromise;
-    expect(transfer.newHostId).toBeTruthy();
-    expect(transfer.oldHostId).toBe(createResult.data.hostId);
+    const disconnectEvent = await disconnectPromise;
+    expect(disconnectEvent.playerId).toBe(facilitatorId);
+
+    // Verify facilitator is still facilitator (just disconnected)
+    const state = sessionManager.getGameState(sessionId);
+    expect(state.facilitatorId).toBe(facilitatorId);
+    const facilitator = state.players.find((p) => p.id === facilitatorId);
+    expect(facilitator.isConnected).toBe(false);
+    expect(facilitator.role).toBe('facilitator');
   });
 
-  it('host leave-session with ack promotes player', async () => {
+  it('facilitator leave-session removes them without promotion', async () => {
     const hostSocket = createSocket();
     const playerSocket = createSocket();
 
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
     );
 
-    const transferPromise = waitForEvent(playerSocket, 'host-transferred');
+    const leftPromise = waitForEvent(playerSocket, 'player-left');
     const ack = await new Promise((r) =>
-      hostSocket.emit('leave-session', { sessionId, playerId: hostId }, r)
+      hostSocket.emit('leave-session', { sessionId, playerId: facilitatorId }, r)
     );
     expect(ack.success).toBe(true);
 
-    const transfer = await transferPromise;
-    expect(transfer.newHostId).toBeTruthy();
+    const leftEvent = await leftPromise;
+    expect(leftEvent.playerId).toBe(facilitatorId);
+
+    // Session still exists with just Bob
+    const state = sessionManager.getGameState(sessionId);
+    expect(state.players).toHaveLength(1);
+    expect(state.players[0].name).toBe('Bob');
   });
 
   it('reconnect after disconnect restores state', async () => {
@@ -301,46 +303,20 @@ describe('Socket.IO Integration Tests', () => {
     expect(bob.isConnected).toBe(true);
   });
 
-  it('host can vote', async () => {
+  it('facilitator can vote', async () => {
     const hostSocket = createSocket();
 
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'VotingHost' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const cardPromise = waitForEvent(hostSocket, 'card-played');
-    hostSocket.emit('play-card', { sessionId, playerId: hostId, value: 13 });
+    hostSocket.emit('play-card', { sessionId, playerId: facilitatorId, value: 13 });
 
     const card = await cardPromise;
-    expect(card.playerId).toBe(hostId);
+    expect(card.playerId).toBe(facilitatorId);
     expect(card.hasVoted).toBe(true);
-  });
-
-  it('transfer host swaps roles for all clients', async () => {
-    const hostSocket = createSocket();
-    const playerSocket = createSocket();
-
-    const createResult = await new Promise((r) =>
-      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
-    );
-    const { sessionId, hostId } = createResult.data;
-
-    const joinResult = await new Promise((r) =>
-      playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
-    );
-    const playerId = joinResult.data.playerId;
-
-    // Both should receive host-transferred
-    const hostTransferPromise = waitForEvent(hostSocket, 'host-transferred');
-    const playerTransferPromise = waitForEvent(playerSocket, 'host-transferred');
-
-    hostSocket.emit('transfer-host', { sessionId, newHostId: playerId });
-
-    const [hostEvent, playerEvent] = await Promise.all([hostTransferPromise, playerTransferPromise]);
-    expect(hostEvent.oldHostId).toBe(hostId);
-    expect(hostEvent.newHostId).toBe(playerId);
-    expect(playerEvent.newHostId).toBe(playerId);
   });
 
   it('all participants see roster, vote status, and tally updates in real time', async () => {
@@ -353,7 +329,7 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     // 1) All participants join and everyone sees the full roster
 
@@ -415,10 +391,10 @@ describe('Socket.IO Integration Tests', () => {
     expect(p2Card1).toEqual({ playerId: player1Id, hasVoted: true });
     expect(obsCard1).toEqual({ playerId: player1Id, hasVoted: true });
 
-    // At this point: 1 of 3 voters voted (host + 2 players are voters, observer is not)
+    // At this point: 1 of 3 voters voted (facilitator + 2 players are voters, observer is not)
     // Verify server state reflects partial voting
     const midState = sessionManager.getGameState(sessionId);
-    const voters = midState.players.filter((p) => p.role === 'host' || p.role === 'player');
+    const voters = midState.players.filter((p) => p.role === 'facilitator' || p.role === 'player');
     expect(voters).toHaveLength(3);
     expect(voters.filter((p) => p.hasVoted)).toHaveLength(1);
 
@@ -438,28 +414,42 @@ describe('Socket.IO Integration Tests', () => {
     expect(obsCard2).toEqual({ playerId: player2Id, hasVoted: true });
 
     // Host plays a card — all 4 participants see the update (tally: 3 of 3)
+    // NOTE: With auto-reveal, when all voters have voted, cards-revealed fires automatically
     const hostSeesCard3 = waitForEvent(hostSocket, 'card-played');
     const p1SeesCard3 = waitForEvent(player1Socket, 'card-played');
     const p2SeesCard3 = waitForEvent(player2Socket, 'card-played');
     const obsSeesCard3 = waitForEvent(observerSocket, 'card-played');
-    hostSocket.emit('play-card', { sessionId, playerId: hostId, value: 13 });
+    // Also listen for auto-reveal
+    const hostSeesReveal = waitForEvent(hostSocket, 'cards-revealed');
+    const p1SeesReveal = waitForEvent(player1Socket, 'cards-revealed');
+    const p2SeesReveal = waitForEvent(player2Socket, 'cards-revealed');
+    const obsSeesReveal = waitForEvent(observerSocket, 'cards-revealed');
+
+    hostSocket.emit('play-card', { sessionId, playerId: facilitatorId, value: 13 });
 
     const [hostCard3, p1Card3, p2Card3, obsCard3] = await Promise.all([
       hostSeesCard3, p1SeesCard3, p2SeesCard3, obsSeesCard3,
     ]);
-    expect(hostCard3).toEqual({ playerId: hostId, hasVoted: true });
-    expect(p1Card3).toEqual({ playerId: hostId, hasVoted: true });
-    expect(p2Card3).toEqual({ playerId: hostId, hasVoted: true });
-    expect(obsCard3).toEqual({ playerId: hostId, hasVoted: true });
+    expect(hostCard3).toEqual({ playerId: facilitatorId, hasVoted: true });
+    expect(p1Card3).toEqual({ playerId: facilitatorId, hasVoted: true });
+    expect(p2Card3).toEqual({ playerId: facilitatorId, hasVoted: true });
+    expect(obsCard3).toEqual({ playerId: facilitatorId, hasVoted: true });
 
-    // 3) Verify final server state — all voters have voted, votes are hidden
+    // Auto-reveal should have fired
+    const [hostReveal, p1Reveal, p2Reveal, obsReveal] = await Promise.all([
+      hostSeesReveal, p1SeesReveal, p2SeesReveal, obsSeesReveal,
+    ]);
+    expect(hostReveal.players).toBeTruthy();
+    expect(p1Reveal.players).toBeTruthy();
+
+    // 3) Verify final server state — all voters have voted, phase is revealed
     const finalState = sessionManager.getGameState(sessionId);
-    const finalVoters = finalState.players.filter((p) => p.role === 'host' || p.role === 'player');
+    expect(finalState.phase).toBe('revealed');
+    const finalVoters = finalState.players.filter((p) => p.role === 'facilitator' || p.role === 'player');
     expect(finalVoters).toHaveLength(3);
     expect(finalVoters.every((p) => p.hasVoted)).toBe(true);
-    // Votes are hidden (null) during voting phase
-    expect(finalVoters.every((p) => p.vote === null)).toBe(true);
-    expect(finalState.phase).toBe('voting');
+    // Votes are visible after reveal
+    expect(finalVoters.every((p) => p.vote !== null)).toBe(true);
 
     // Observer should NOT be counted as a voter
     const obs = finalState.players.find((p) => p.role === 'observer');
@@ -473,7 +463,7 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId } = createResult.data;
 
     const joinResult = await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
@@ -505,14 +495,14 @@ describe('Socket.IO Integration Tests', () => {
 
   // --- Bug Report Regression Tests ---
 
-  it('reconnecting player does not steal host role', async () => {
+  it('reconnecting player does not steal facilitator role', async () => {
     const hostSocket = createSocket();
     const playerSocket = createSocket();
 
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const joinResult = await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
@@ -532,13 +522,13 @@ describe('Socket.IO Integration Tests', () => {
     expect(reconnectResult.success).toBe(true);
     const { gameState } = reconnectResult.data;
 
-    // Host should still be em
-    expect(gameState.hostId).toBe(hostId);
-    const host = gameState.players.find((p) => p.id === hostId);
-    expect(host.name).toBe('em');
-    expect(host.role).toBe('host');
+    // Facilitator should still be em
+    expect(gameState.facilitatorId).toBe(facilitatorId);
+    const facilitator = gameState.players.find((p) => p.id === facilitatorId);
+    expect(facilitator.name).toBe('em');
+    expect(facilitator.role).toBe('facilitator');
 
-    // dev1 should be a player, not host
+    // dev1 should be a player, not facilitator
     const dev1 = gameState.players.find((p) => p.id === playerId);
     expect(dev1.role).toBe('player');
     expect(dev1.isConnected).toBe(true);
@@ -584,26 +574,26 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: { ...defaultSettings, showCountdown: false }, hostName: 'em' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const joinResult = await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
     );
     const playerId = joinResult.data.playerId;
 
-    // Both vote
+    // Both vote (but don't let auto-reveal trigger — vote one at a time and reveal manually)
+    // Actually with auto-reveal, when both vote it will auto-reveal. Let's use that flow.
     const hostCardPlayed = waitForEvent(playerSocket, 'card-played');
-    hostSocket.emit('play-card', { sessionId, playerId: hostId, value: 8 });
-    playerSocket.emit('play-card', { sessionId, playerId, value: 5 });
+    hostSocket.emit('play-card', { sessionId, playerId: facilitatorId, value: 8 });
     await hostCardPlayed;
 
-    // Reveal
+    // When player votes (all voters done), auto-reveal will fire
     const revealReceived = waitForEvent(playerSocket, 'cards-revealed');
-    hostSocket.emit('reveal-cards', { sessionId });
+    playerSocket.emit('play-card', { sessionId, playerId, value: 5 });
     const revealEvent = await revealReceived;
 
     // Vote values should be visible after reveal
-    const emVote = revealEvent.players.find((p) => p.id === hostId);
+    const emVote = revealEvent.players.find((p) => p.id === facilitatorId);
     const dev1Vote = revealEvent.players.find((p) => p.id === playerId);
     expect(emVote.vote).toBe(8);
     expect(dev1Vote.vote).toBe(5);
@@ -616,47 +606,38 @@ describe('Socket.IO Integration Tests', () => {
     expect(resetEvent.isReVote).toBe(false);
   });
 
-  it('host reconnect within 5s preserves host role', async () => {
+  it('facilitator reconnect preserves facilitator role', async () => {
     const hostSocket = createSocket();
     const playerSocket = createSocket();
 
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
     );
 
-    // Host disconnects (simulates page refresh)
+    // Facilitator disconnects (simulates page refresh)
     hostSocket.disconnect();
     await new Promise((r) => setTimeout(r, 500));
 
-    // Host reconnects quickly (within 5s)
+    // Facilitator reconnects
     const reconnectSocket = createSocket();
     const reconnectResult = await new Promise((r) =>
-      reconnectSocket.emit('reconnect-session', { sessionId, playerId: hostId }, r)
+      reconnectSocket.emit('reconnect-session', { sessionId, playerId: facilitatorId }, r)
     );
 
     expect(reconnectResult.success).toBe(true);
     const { gameState } = reconnectResult.data;
 
-    // em should still be host
-    expect(gameState.hostId).toBe(hostId);
-    const host = gameState.players.find((p) => p.id === hostId);
-    expect(host.role).toBe('host');
-    expect(host.isConnected).toBe(true);
-
-    // Wait past the 5s promote window — should NOT transfer
-    await new Promise((r) => setTimeout(r, 6000));
-
-    // Verify host is still em by checking server state
-    const finalResult = await new Promise((r) =>
-      reconnectSocket.emit('reconnect-session', { sessionId, playerId: hostId }, r)
-    );
-    expect(finalResult.data.gameState.hostId).toBe(hostId);
-  }, 10000);
+    // em should still be facilitator
+    expect(gameState.facilitatorId).toBe(facilitatorId);
+    const facilitator = gameState.players.find((p) => p.id === facilitatorId);
+    expect(facilitator.role).toBe('facilitator');
+    expect(facilitator.isConnected).toBe(true);
+  });
 
   it('joining player appears exactly once with correct roles', async () => {
     const hostSocket = createSocket();
@@ -665,7 +646,7 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'em' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const joinResult = await new Promise((r) =>
       playerSocket.emit('join-session', { sessionId, role: 'player', name: 'dev1' }, r)
@@ -677,11 +658,11 @@ describe('Socket.IO Integration Tests', () => {
     expect(dev1Entries).toHaveLength(1);
     expect(dev1Entries[0].role).toBe('player');
 
-    // em should still be host
-    const host = gameState.players.find((p) => p.id === hostId);
-    expect(host.name).toBe('em');
-    expect(host.role).toBe('host');
-    expect(gameState.hostId).toBe(hostId);
+    // em should still be facilitator
+    const facilitator = gameState.players.find((p) => p.id === facilitatorId);
+    expect(facilitator.name).toBe('em');
+    expect(facilitator.role).toBe('facilitator');
+    expect(gameState.facilitatorId).toBe(facilitatorId);
   });
 
   it('session destroyed when no players to promote', async () => {
@@ -690,10 +671,10 @@ describe('Socket.IO Integration Tests', () => {
     const createResult = await new Promise((r) =>
       hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'LonelyHost' }, r)
     );
-    const { sessionId, hostId } = createResult.data;
+    const { sessionId, facilitatorId } = createResult.data;
 
     const ack = await new Promise((r) =>
-      hostSocket.emit('leave-session', { sessionId, playerId: hostId }, r)
+      hostSocket.emit('leave-session', { sessionId, playerId: facilitatorId }, r)
     );
     expect(ack.success).toBe(true);
     expect(sessionManager.getGameState(sessionId)).toBeNull();
