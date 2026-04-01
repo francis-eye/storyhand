@@ -24,9 +24,9 @@ export default function Header() {
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         {/* Storyhand text logo */}
-        <span className="text-xl font-bold tracking-tight">
+        <span className="text-xl font-bold tracking-tight font-space-mono">
           <span className="text-blue-600">Story</span>
-          <span className="text-gray-800">hand</span>
+          <span className="text-gray-800 dark:text-gray-200">hand</span>
         </span>
       </button>
 
