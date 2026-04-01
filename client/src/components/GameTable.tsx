@@ -40,7 +40,10 @@ export default function GameTable({ players, phase, showAverage, countdownValue,
                 <div
                   key={player.id}
                   className="flex flex-col items-center gap-1"
-                  style={{ transform: `rotate(${rotation}deg)` }}
+                  style={{
+                    transform: `rotate(${rotation}deg)`,
+                    animation: 'dealCard 0.3s ease-out',
+                  }}
                 >
                   <PlayingCard
                     value={player.vote!}
