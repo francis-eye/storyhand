@@ -7,14 +7,25 @@ import DarkModeToggle from './DarkModeToggle';
 export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { state, actions } = useGameState();
+  const { state, currentPlayerId, actions } = useGameState();
   const { openFeedback } = useFeedback();
   const isLanding = location.pathname === '/';
   const inSession = !!state;
 
+  const currentPlayer = state?.players.find(p => p.id === currentPlayerId);
+  const isFacilitator = currentPlayer?.role === 'facilitator';
+
   const handleExit = () => {
-    if (inSession) actions.leaveGame();
-    navigate('/');
+    if (inSession && isFacilitator) {
+      // Facilitator ends the session — summary card handles navigation
+      actions.endSession();
+    } else if (inSession) {
+      // Non-facilitator leaves and goes home
+      actions.leaveGame();
+      navigate('/');
+    } else {
+      navigate('/');
+    }
   };
 
   return (

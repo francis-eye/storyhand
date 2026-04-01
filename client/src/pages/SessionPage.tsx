@@ -25,6 +25,19 @@ export default function SessionPage() {
     );
   }
 
+  // Show session summary overlay even when state is null (session just ended)
+  if (!state && sessionSummary) {
+    return (
+      <SessionSummaryCard
+        summary={sessionSummary}
+        onDone={() => {
+          clearSessionSummary();
+          navigate('/');
+        }}
+      />
+    );
+  }
+
   // If no active game state, show fallback
   if (!state) {
     return (
