@@ -21,14 +21,14 @@ export default function GameTable({ players, phase, showAverage, countdownValue,
   const isRevealed = phase === 'revealed';
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-3 md:p-6 gap-3 md:gap-6 relative">
+    <div className="flex flex-col items-center justify-center p-4 gap-4 h-full relative">
       {/* Vote counter */}
       <p className={`text-sm ${theme.table.voteCountText}`}>
         {votedPlayers.length} of {voters.length} players voted
       </p>
 
       {/* Poker table */}
-      <div className={`relative min-h-[180px] md:min-h-[280px] w-full max-w-2xl flex items-center justify-center p-4 md:p-8 ${theme.table.background} ${theme.table.border} ${theme.table.scanlines ? 'theme-16bit-scanlines' : ''}`}>
+      <div className={`relative min-h-[180px] md:min-h-[280px] w-full max-w-3xl flex items-center justify-center p-4 md:p-8 ${theme.table.background} ${theme.table.border} ${theme.table.scanlines ? 'theme-16bit-scanlines' : ''}`}>
         {votedPlayers.length === 0 ? (
           <p className={`text-sm ${theme.table.emptyText}`}>Waiting for votes...</p>
         ) : (
@@ -40,7 +40,10 @@ export default function GameTable({ players, phase, showAverage, countdownValue,
                 <div
                   key={player.id}
                   className="flex flex-col items-center gap-1"
-                  style={{ transform: `rotate(${rotation}deg)` }}
+                  style={{
+                    transform: `rotate(${rotation}deg)`,
+                    animation: 'dealCard 0.3s ease-out',
+                  }}
                 >
                   <PlayingCard
                     value={player.vote!}

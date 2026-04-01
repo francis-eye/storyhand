@@ -59,6 +59,13 @@ export class SessionManager {
       isConnected: true,
       disconnectedAt: null,
       socketId: null, // set when socket connects
+      stats: {
+        firstToVoteCount: 0,
+        achievementCount: 0,
+        closestToAverageCount: 0,
+        afkCount: 0,
+        voteTimestamps: [],
+      },
     };
 
     const session = {
@@ -71,6 +78,15 @@ export class SessionManager {
       isReVoting: false,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
+      stats: {
+        consensusStreak: 0,
+        bestStreak: 0,
+        roundStartTime: Date.now(),
+        consensusRounds: 0,
+        totalRevealedRounds: 0,
+        achievements: [],
+        firstVoterId: null,
+      },
     };
 
     this.sessions.set(sessionId, session);
@@ -97,6 +113,13 @@ export class SessionManager {
       isConnected: true,
       disconnectedAt: null,
       socketId,
+      stats: {
+        firstToVoteCount: 0,
+        achievementCount: 0,
+        closestToAverageCount: 0,
+        afkCount: 0,
+        voteTimestamps: [],
+      },
     };
 
     session.players.set(playerId, player);
@@ -135,6 +158,13 @@ export class SessionManager {
     } else {
       player.vote = value;
       player.hasVoted = true;
+      player.stats.voteTimestamps.push(Date.now());
+      if (value === '☕') {
+        player.stats.afkCount++;
+      }
+      if (!session.stats.firstVoterId) {
+        session.stats.firstVoterId = playerId;
+      }
     }
     session.lastActivityAt = Date.now();
 
@@ -155,6 +185,8 @@ export class SessionManager {
     session.phase = 'revealed';
     session.lastActivityAt = Date.now();
 
+    const achievement = this.computeAchievement(session);
+
     const players = Array.from(session.players.values()).map(p => ({
       id: p.id,
       name: p.name,
@@ -165,7 +197,180 @@ export class SessionManager {
       disconnectedAt: p.disconnectedAt,
     }));
 
-    return { players };
+    return { players, achievement };
+  }
+
+  computeAchievement(session) {
+    const voters = Array.from(session.players.values()).filter(
+      p => (p.role === 'player' || p.role === 'facilitator') && p.hasVoted
+    );
+    if (voters.length === 0) return null;
+
+    const votes = voters.map(p => p.vote);
+    const numericVotes = votes.filter(v => typeof v === 'number');
+
+    // Check consensus
+    const isConsensus = numericVotes.length === voters.length &&
+      numericVotes.every(v => v === numericVotes[0]);
+
+    // Update streak
+    if (isConsensus) {
+      session.stats.consensusStreak++;
+      session.stats.consensusRounds++;
+      if (session.stats.consensusStreak > session.stats.bestStreak) {
+        session.stats.bestStreak = session.stats.consensusStreak;
+      }
+    } else {
+      session.stats.consensusStreak = 0;
+    }
+    session.stats.totalRevealedRounds++;
+
+    // Compute closest-to-average for player stats
+    if (numericVotes.length > 0) {
+      const avg = numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length;
+      let closestPlayer = null;
+      let closestDiff = Infinity;
+      for (const v of voters) {
+        if (typeof v.vote === 'number') {
+          const diff = Math.abs(v.vote - avg);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            closestPlayer = v;
+          }
+        }
+      }
+      if (closestPlayer) {
+        closestPlayer.stats.closestToAverageCount++;
+      }
+    }
+
+    // Track first-to-vote player stat
+    if (session.stats.firstVoterId) {
+      const firstVoter = session.players.get(session.stats.firstVoterId);
+      if (firstVoter) {
+        firstVoter.stats.firstToVoteCount++;
+      }
+    }
+
+    // FIBONACCI sequence for "near miss" check
+    const FIB = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
+
+    // Determine achievement by priority
+    let achievement = null;
+
+    // Priority 1: Streak milestones (override Hive Mind)
+    if (isConsensus && session.stats.consensusStreak >= 10) {
+      achievement = { id: 'legendary', icon: '🏆', title: 'Legendary', description: '10 consecutive consensus rounds' };
+    } else if (isConsensus && session.stats.consensusStreak >= 5) {
+      achievement = { id: 'unstoppable', icon: '🔥🔥', title: 'Unstoppable', description: '5 in a row, this team gets it' };
+    } else if (isConsensus && session.stats.consensusStreak >= 3) {
+      achievement = { id: 'on-fire', icon: '🔥', title: 'On Fire', description: '3 consensus rounds in a row' };
+    } else if (isConsensus) {
+      // Priority 1: Hive Mind (standard consensus)
+      achievement = { id: 'hive-mind', icon: '🤝', title: 'Hive Mind', description: 'Full consensus — everyone played the same card' };
+    }
+
+    if (!achievement) {
+      // Priority 2: Near Miss — all votes within 1 Fibonacci step
+      if (numericVotes.length >= 2) {
+        const indices = numericVotes.map(v => FIB.indexOf(v)).filter(i => i !== -1);
+        if (indices.length === numericVotes.length) {
+          const maxIdx = Math.max(...indices);
+          const minIdx = Math.min(...indices);
+          if (maxIdx - minIdx <= 1) {
+            achievement = { id: 'near-miss', icon: '🎯', title: 'Near Miss', description: 'All votes within one step of each other' };
+          }
+        }
+      }
+    }
+
+    if (!achievement) {
+      // Priority 3: The Contrarian — exactly one outlier
+      if (numericVotes.length >= 3) {
+        const voteCounts = new Map();
+        voters.forEach(v => {
+          const key = String(v.vote);
+          voteCounts.set(key, (voteCounts.get(key) || 0) + 1);
+        });
+        const singles = [];
+        for (const [val, count] of voteCounts) {
+          if (count === 1) singles.push(val);
+        }
+        if (singles.length === 1) {
+          const contrarian = voters.find(v => String(v.vote) === singles[0]);
+          if (contrarian) {
+            achievement = { id: 'contrarian', icon: '🔮', title: 'The Contrarian', description: `${contrarian.name} voted differently from everyone`, playerId: contrarian.id };
+          }
+        }
+      }
+    }
+
+    if (!achievement && session.stats.firstVoterId) {
+      // Priority 4: First to Vote
+      const firstVoter = session.players.get(session.stats.firstVoterId);
+      if (firstVoter) {
+        achievement = { id: 'first-to-vote', icon: '⚡', title: 'First to Vote', description: `${firstVoter.name} played their card first`, playerId: firstVoter.id };
+      }
+    }
+
+    if (!achievement) {
+      // Priority 5: The Holdout — last voter (only if auto-reveal triggered, which it always does now)
+      // Find the voter who voted last by timestamp
+      const votersWithTimestamps = voters.filter(v => v.stats.voteTimestamps.length > 0);
+      if (votersWithTimestamps.length >= 2) {
+        const lastVoter = votersWithTimestamps.reduce((latest, v) => {
+          const lastTs = v.stats.voteTimestamps[v.stats.voteTimestamps.length - 1];
+          const latestTs = latest.stats.voteTimestamps[latest.stats.voteTimestamps.length - 1];
+          return lastTs > latestTs ? v : latest;
+        });
+        achievement = { id: 'holdout', icon: '🐢', title: 'The Holdout', description: `${lastVoter.name} was the last to vote`, playerId: lastVoter.id };
+      }
+    }
+
+    if (!achievement) {
+      // Priority 6: Speed Round — all voted within 10 seconds of round start
+      if (session.stats.roundStartTime && voters.length >= 2) {
+        const allFast = voters.every(v => {
+          const lastTs = v.stats.voteTimestamps[v.stats.voteTimestamps.length - 1];
+          return lastTs && (lastTs - session.stats.roundStartTime) < 10000;
+        });
+        if (allFast) {
+          achievement = { id: 'speed-round', icon: '💨', title: 'Speed Round', description: 'Everyone voted within 10 seconds' };
+        }
+      }
+    }
+
+    if (!achievement) {
+      // Priority 7: All Over the Map — 4+ unique Fibonacci values
+      const uniqueVotes = new Set(votes.map(String));
+      if (uniqueVotes.size >= 4) {
+        achievement = { id: 'all-over-map', icon: '🗺️', title: 'All Over the Map', description: `${uniqueVotes.size} different values — time to discuss` };
+      }
+    }
+
+    if (!achievement) {
+      // Priority 8: Coffee Break — someone played ☕
+      const afkPlayer = voters.find(v => v.vote === '☕');
+      if (afkPlayer) {
+        achievement = { id: 'coffee-break', icon: '☕', title: 'Coffee Break', description: `${afkPlayer.name} needs more caffeine`, playerId: afkPlayer.id };
+      }
+    }
+
+    // Track achievement for the player
+    if (achievement) {
+      session.stats.achievements.push({
+        roundNumber: session.currentRound,
+        achievementId: achievement.id,
+        playerId: achievement.playerId || null,
+      });
+      // Increment achievementCount for the relevant player
+      if (achievement.playerId) {
+        const p = session.players.get(achievement.playerId);
+        if (p) p.stats.achievementCount++;
+      }
+    }
+
+    return achievement;
   }
 
   revealCards(sessionId) {
@@ -174,6 +379,8 @@ export class SessionManager {
 
     session.phase = 'revealed';
     session.lastActivityAt = Date.now();
+
+    const achievement = this.computeAchievement(session);
 
     // Return full player data with votes exposed
     const players = Array.from(session.players.values()).map(p => ({
@@ -186,7 +393,7 @@ export class SessionManager {
       disconnectedAt: p.disconnectedAt,
     }));
 
-    return { players };
+    return { players, achievement };
   }
 
   newRound(sessionId) {
@@ -247,7 +454,7 @@ export class SessionManager {
     // Check auto-reveal: disconnected player excluded from threshold
     const autoRevealResult = this.checkAutoReveal(session);
     if (autoRevealResult && this.onBroadcast) {
-      this.onBroadcast(sessionId, 'cards-revealed', { players: autoRevealResult.players });
+      this.onBroadcast(sessionId, 'cards-revealed', { players: autoRevealResult.players, achievement: autoRevealResult.achievement || null });
     }
 
     return { playerId };
@@ -336,10 +543,70 @@ export class SessionManager {
     return { playerId: targetPlayerId, autoReveal: autoRevealResult };
   }
 
+  computeSessionSummary(session) {
+    const durationMs = Date.now() - session.createdAt;
+    const durationMinutes = Math.round(durationMs / 60000);
+    const allPlayers = Array.from(session.players.values());
+    const voters = allPlayers.filter(p => p.role === 'player' || p.role === 'facilitator');
+
+    const consensusRate = session.stats.totalRevealedRounds > 0
+      ? Math.round((session.stats.consensusRounds / session.stats.totalRevealedRounds) * 100)
+      : 0;
+
+    // MVP: Most Achievements
+    let mostAchievements = null;
+    const maxAch = Math.max(...voters.map(p => p.stats.achievementCount), 0);
+    if (maxAch > 0) {
+      const p = voters.find(v => v.stats.achievementCount === maxAch);
+      if (p) mostAchievements = { name: p.name, count: p.stats.achievementCount };
+    }
+
+    // MVP: Most Accurate (closest to average)
+    let mostAccurate = null;
+    const maxAccurate = Math.max(...voters.map(p => p.stats.closestToAverageCount), 0);
+    if (maxAccurate > 0) {
+      const p = voters.find(v => v.stats.closestToAverageCount === maxAccurate);
+      if (p) mostAccurate = { name: p.name, count: p.stats.closestToAverageCount, total: session.stats.totalRevealedRounds };
+    }
+
+    // MVP: Most AFK
+    let mostAfk = null;
+    const maxAfk = Math.max(...voters.map(p => p.stats.afkCount), 0);
+    if (maxAfk > 0) {
+      const p = voters.find(v => v.stats.afkCount === maxAfk);
+      if (p) mostAfk = { name: p.name, count: p.stats.afkCount };
+    }
+
+    // MVP: Fastest Voter (using firstToVoteCount as proxy)
+    let fastestVoter = null;
+    const maxFirstVote = Math.max(...voters.map(p => p.stats.firstToVoteCount), 0);
+    if (maxFirstVote > 0) {
+      const p = voters.find(v => v.stats.firstToVoteCount === maxFirstVote);
+      if (p) fastestVoter = { name: p.name, count: p.stats.firstToVoteCount };
+    }
+
+    return {
+      gameName: session.settings.gameName,
+      totalRounds: session.currentRound,
+      durationMinutes,
+      playerCount: allPlayers.length,
+      consensusRate,
+      bestStreak: session.stats.bestStreak,
+      mvps: {
+        mostAchievements,
+        mostAccurate,
+        mostAfk,
+        fastestVoter,
+      },
+    };
+  }
+
   endSession(sessionId, requesterId) {
     const session = this.sessions.get(sessionId);
     if (!session) return { error: 'Session not found' };
     if (session.facilitatorId !== requesterId) return { error: 'Only the facilitator can end the session' };
+
+    const summary = this.computeSessionSummary(session);
 
     for (const [key, timer] of this.disconnectTimers) {
       if (key.startsWith(`${sessionId}:`)) {
@@ -349,7 +616,7 @@ export class SessionManager {
     }
 
     this.sessions.delete(sessionId);
-    return { sessionDestroyed: true };
+    return { sessionDestroyed: true, summary };
   }
 
   // --- State queries ---
@@ -376,6 +643,7 @@ export class SessionManager {
       facilitatorId: session.facilitatorId,
       isReVoting: session.isReVoting,
       countdownValue: null, // countdown is client-side only
+      consensusStreak: session.stats.consensusStreak,
     };
   }
 
@@ -445,6 +713,8 @@ export class SessionManager {
     session.phase = 'voting';
     session.isReVoting = false;
     session.lastActivityAt = Date.now();
+    session.stats.firstVoterId = null;
+    session.stats.roundStartTime = Date.now();
     for (const player of session.players.values()) {
       player.vote = null;
       player.hasVoted = false;

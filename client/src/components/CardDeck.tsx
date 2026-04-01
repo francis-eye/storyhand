@@ -38,7 +38,7 @@ export default function CardDeck({ selectedValue, onSelect, disabled = false, th
   }, []);
 
   return (
-    <div className={`relative w-full border-t ${theme.deck.border} ${theme.deck.background}`}>
+    <div className={`relative w-full border-t ${theme.deck.border || 'border-[var(--deck-tray-border)]'} ${theme.deck.background || 'bg-[var(--deck-tray-bg)]'}`}>
       <div ref={scrollRef} className="w-full overflow-x-auto py-2 md:py-4 px-2">
         <div className="flex gap-1.5 md:gap-2 justify-center min-w-max">
           {FIBONACCI_DECK.map((value) => (

@@ -93,7 +93,7 @@ function AnimatedCounter({ end, label, duration = 2000 }: { end: number; label: 
       <div className="text-3xl sm:text-4xl font-black font-space-mono" style={{ color: '#4f46e5' }}>
         {count.toLocaleString()}+
       </div>
-      <div className="text-sm text-gray-500 mt-1 font-medium">{label}</div>
+      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">{label}</div>
     </div>
   );
 }
@@ -126,7 +126,7 @@ function AchievementBadge({ icon, title, description, color, delay }: {
       </div>
       <div>
         <div className="font-bold text-sm" style={{ color }}>{title}</div>
-        <div className="text-xs text-gray-500">{description}</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">{description}</div>
       </div>
     </div>
   );
@@ -159,11 +159,11 @@ function FeatureCard({ icon, title, description, delay }: {
     <div
       ref={ref}
       className={`p-6 rounded-2xl transition-all duration-500 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}
-      style={{ background: '#faf9f7', border: '1px solid #e8e5df' }}
+      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-default)' }}
     >
       <div className="text-2xl mb-3">{icon}</div>
-      <div className="font-bold text-gray-900 mb-2">{title}</div>
-      <div className="text-sm text-gray-500 leading-relaxed">{description}</div>
+      <div className="font-bold text-[var(--text-primary)] mb-2">{title}</div>
+      <div className="text-sm text-[var(--text-secondary)] leading-relaxed">{description}</div>
     </div>
   );
 }
@@ -181,20 +181,20 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="font-dm-sans" style={{ background: '#fefdfb', minHeight: '100vh' }}>
+    <div className="font-dm-sans" style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 sm:px-12 py-4" style={{ borderBottom: '1px solid #f0ede8' }}>
+      <nav className="flex items-center justify-between px-6 sm:px-12 py-4" style={{ borderBottom: '1px solid var(--border-default)' }}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#4f46e5' }}>
             <span className="text-white text-sm font-bold">🃏</span>
           </div>
-          <span className="font-bold text-lg text-gray-900 font-space-mono">
+          <span className="font-bold text-lg text-gray-900 dark:text-white font-space-mono">
             <span style={{ color: '#4f46e5' }}>Story</span>hand
           </span>
         </div>
         <div className="flex items-center gap-3">
           <button
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100"
+            className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
             onClick={() => navigate('/join')}
           >
             Join Game
@@ -220,7 +220,7 @@ export default function LandingPage() {
               <span>🎮</span> Now with 16-Bit Mode
             </div>
             <h1
-              className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight mb-6 text-gray-900"
+              className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight mb-6 text-gray-900 dark:text-white"
               style={{ letterSpacing: '-0.02em' }}
             >
               Sprint planning
@@ -229,7 +229,7 @@ export default function LandingPage() {
               <br />
               <span style={{ color: '#4f46e5' }}>game night.</span>
             </h1>
-            <p className="text-lg text-gray-500 mb-8 leading-relaxed max-w-lg">
+            <p className="text-lg text-gray-500 dark:text-gray-400 mb-8 leading-relaxed max-w-lg">
               Storyhand is real-time planning poker for distributed teams.
               Create a session, share the code, and estimate stories together —
               with auto-reveal, streak tracking, and zero sign-up required.
@@ -290,12 +290,12 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2
-              className="text-3xl sm:text-4xl font-black text-gray-900 mb-4"
+              className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white mb-4"
               style={{ letterSpacing: '-0.02em' }}
             >
               Three steps. Zero friction.
             </h2>
-            <p className="text-gray-500 text-lg">No accounts. No downloads. No setup wizard.</p>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">No accounts. No downloads. No setup wizard.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -304,13 +304,13 @@ export default function LandingPage() {
               { step: '02', title: 'Share the code', desc: 'Drop the 6-character code in Slack or Zoom. Your team joins instantly.', icon: '🔗' },
               { step: '03', title: 'Estimate together', desc: 'Everyone plays a card. When the last vote lands, cards flip automatically.', icon: '🃏' },
             ].map((item) => (
-              <div key={item.step} className="p-6 rounded-2xl" style={{ background: '#faf9f7', border: '1px solid #e8e5df' }}>
+              <div key={item.step} className="p-6 rounded-2xl" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-default)' }}>
                 <div className="text-xs font-bold mb-4 font-space-mono" style={{ color: '#4f46e5' }}>
                   STEP {item.step}
                 </div>
                 <div className="text-3xl mb-3">{item.icon}</div>
-                <div className="font-bold text-gray-900 text-lg mb-2">{item.title}</div>
-                <div className="text-sm text-gray-500 leading-relaxed">{item.desc}</div>
+                <div className="font-bold text-[var(--text-primary)] text-lg mb-2">{item.title}</div>
+                <div className="text-sm text-[var(--text-secondary)] leading-relaxed">{item.desc}</div>
               </div>
             ))}
           </div>
@@ -318,17 +318,17 @@ export default function LandingPage() {
       </section>
 
       {/* Gamification preview */}
-      <section className="px-6 sm:px-12 py-16 sm:py-24" style={{ background: '#f8f7f4' }}>
+      <section className="px-6 sm:px-12 py-16 sm:py-24" style={{ background: 'var(--bg-tertiary)' }}>
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2
-                className="text-3xl sm:text-4xl font-black text-gray-900 mb-4"
+                className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white mb-4"
                 style={{ letterSpacing: '-0.02em' }}
               >
                 Estimation,<br />but make it fun.
               </h2>
-              <p className="text-gray-500 text-lg mb-8 leading-relaxed">
+              <p className="text-gray-500 dark:text-gray-400 text-lg mb-8 leading-relaxed">
                 Earn achievements, track consensus streaks, and see who's the team's most accurate estimator.
                 Because refinement doesn't have to feel like refinement.
               </p>
@@ -349,7 +349,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2
-              className="text-3xl sm:text-4xl font-black text-gray-900 mb-4"
+              className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white mb-4"
               style={{ letterSpacing: '-0.02em' }}
             >
               Everything you need. Nothing you don't.
@@ -406,7 +406,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="px-6 sm:px-12 py-8" style={{ borderTop: '1px solid #f0ede8' }}>
+      <footer className="px-6 sm:px-12 py-8" style={{ borderTop: '1px solid var(--border-default)' }}>
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-gray-400 font-space-mono">
@@ -415,10 +415,10 @@ export default function LandingPage() {
             <span className="text-gray-300 text-xs">· Built with ☕ and story points</span>
           </div>
           <div className="flex gap-6 text-xs text-gray-400">
-            <button onClick={() => navigate('/privacy')} className="hover:text-gray-600 transition-colors">
+            <button onClick={() => navigate('/privacy')} className="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
               Privacy
             </button>
-            <a href="https://github.com/francis-eye/storyhand" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">
+            <a href="https://github.com/francis-eye/storyhand" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
               GitHub
             </a>
           </div>

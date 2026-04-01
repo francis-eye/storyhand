@@ -1,6 +1,7 @@
 import type { Player } from '../types/game';
+import type { CardValue } from '../types/game';
 import type { ThemeConfig } from '../themes/themeRegistry';
-import { calculateAverage, checkConsensus, canVote } from '../utils/session';
+import { calculateAverage, checkConsensus, canVote, getCardColor } from '../utils/session';
 
 interface ResultsPanelProps {
   players: Player[];
@@ -30,7 +31,7 @@ export default function ResultsPanel({ players, showAverage, theme }: ResultsPan
     Math.max(...numericVotes) / Math.max(Math.min(...numericVotes), 1) > 5;
 
   return (
-    <div className={`rounded-xl p-6 max-w-sm w-full ${theme.results.background}`}>
+    <div className={`rounded-xl p-6 max-w-sm w-full ${theme.results.background || 'bg-[var(--results-bg)] border border-[var(--results-border)]'}`}>
       {/* Consensus banner */}
       {consensus && (
         <div className={`border rounded-lg px-4 py-2 mb-4 text-center ${theme.results.consensusBg} ${theme.results.consensusBorder}`}>
@@ -70,7 +71,7 @@ export default function ResultsPanel({ players, showAverage, theme }: ResultsPan
           })
           .map(([value, count]) => (
             <div key={value} className="flex items-center gap-2">
-              <span className={`w-8 text-right text-sm font-medium ${theme.results.barLabel}`}>{value}</span>
+              <span className="w-8 text-right text-sm font-medium" style={{ color: getCardColor(value as CardValue) }}>{value}</span>
               <div className={`flex-1 rounded-full h-5 overflow-hidden ${theme.results.barBg}`}>
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${theme.results.barFill}`}

@@ -155,7 +155,7 @@ io.on('connection', (socket) => {
     io.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
 
     if (result.autoReveal) {
-      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players });
+      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players, achievement: result.autoReveal.achievement || null });
     }
   });
 
@@ -168,7 +168,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    io.to(sessionId).emit('cards-revealed', { players: result.players });
+    io.to(sessionId).emit('cards-revealed', { players: result.players, achievement: result.achievement || null });
   });
 
   // --- New round ---
@@ -241,7 +241,7 @@ io.on('connection', (socket) => {
     console.log(`Facilitator kicked player ${targetPlayerId} from session ${sessionId}`);
 
     if (result.autoReveal) {
-      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players });
+      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players, achievement: result.autoReveal.achievement || null });
     }
 
     // Force-disconnect the kicked player's socket
@@ -267,10 +267,10 @@ io.on('connection', (socket) => {
       return;
     }
 
-    io.to(sessionId).emit('session-expired', {});
+    io.to(sessionId).emit('session-expired', { summary: result.summary });
     console.log(`Facilitator ended session ${sessionId}`);
 
-    if (typeof callback === 'function') callback({ success: true });
+    if (typeof callback === 'function') callback({ success: true, summary: result.summary });
   });
 
   // --- Submit feedback (fire-and-forget, no callback) ---

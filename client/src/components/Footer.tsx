@@ -7,12 +7,12 @@ export default function Footer() {
   const { openFeedback } = useFeedback();
 
   return (
-    <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-3 text-xs text-gray-400">
-      <span>By <a href="https://github.com/francis-eye" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">francis-eye</a></span>
+    <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+      <span>By <a href="https://github.com/francis-eye" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300">francis-eye</a></span>
       <span>&middot;</span>
-      <a onClick={() => navigate('/privacy')} className="hover:text-gray-600 cursor-pointer">Privacy Policy</a>
+      <a onClick={() => navigate('/privacy')} className="hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">Privacy Policy</a>
       <span>&middot;</span>
-      <a onClick={openFeedback} className="hover:text-gray-600 cursor-pointer">Send Feedback</a>
+      <a onClick={openFeedback} className="hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer">Send Feedback</a>
     </div>
   );
 }

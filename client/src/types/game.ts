@@ -31,6 +31,31 @@ export interface GameSettings {
   tableTheme: TableTheme;
 }
 
+// Achievement earned during a round
+export interface Achievement {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  playerId?: string;
+}
+
+// Summary shown when a session ends
+export interface SessionSummary {
+  gameName: string;
+  totalRounds: number;
+  durationMinutes: number;
+  playerCount: number;
+  consensusRate: number;
+  bestStreak: number;
+  mvps: {
+    mostAchievements?: { name: string; count: number } | null;
+    mostAccurate?: { name: string; count: number; total: number } | null;
+    mostAfk?: { name: string; count: number } | null;
+    fastestVoter?: { name: string; count: number } | null;
+  };
+}
+
 // Full state of an active session
 export interface GameState {
   sessionId: string;
@@ -41,6 +66,7 @@ export interface GameState {
   facilitatorId: string;
   isReVoting: boolean;
   countdownValue: number | null;
+  consensusStreak: number;
 }
 
 // The 13-card Fibonacci deck

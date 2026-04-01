@@ -44,7 +44,7 @@ export default function GameControls({
   }, [phase]);
 
   return (
-    <div className={`rounded-none md:rounded-full px-4 md:px-6 py-2.5 md:py-3 flex items-center justify-center gap-4 shadow-xl z-50 md:fixed md:bottom-28 md:left-1/2 md:-translate-x-1/2 ${theme.gameControls.background}`}>
+    <div className={`flex items-center justify-center gap-4 px-4 py-2.5 ${theme.gameControls.background || 'bg-[var(--controls-bg)] border-t border-[var(--controls-border)] text-[var(--text-primary)]'}`}>
       {phase === 'voting' && (
         <>
           <span className={`text-sm ${theme.gameControls.voteCountText}`}>

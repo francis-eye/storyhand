@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { io } from 'socket.io-client';
-import type { GameState, Player, Role, CardValue, GamePhase } from '../types/game';
+import type { GameState, Player, Role, CardValue, GamePhase, Achievement, SessionSummary } from '../types/game';
 import type { GameSettings } from '../types/game';
 import { getStoredSession, storeSession, clearStoredSession, refreshSessionTimestamp } from '../utils/session';
 
@@ -61,6 +61,9 @@ interface GameContextValue {
   isReconnecting: boolean;
   missedRounds: number;
   clearMissedRounds: () => void;
+  currentAchievement: Achievement | null;
+  sessionSummary: SessionSummary | null;
+  clearSessionSummary: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -82,6 +85,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
   const [missedRounds, setMissedRounds] = useState<number>(0);
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
 
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
@@ -135,7 +140,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on('cards-revealed', ({ players }: { players: Player[] }) => {
+    socket.on('cards-revealed', ({ players, achievement }: { players: Player[]; achievement?: Achievement }) => {
       setState(prev => {
         if (!prev) return prev;
 
@@ -170,6 +175,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
         return { ...prev, phase: 'revealed', players, countdownValue: null };
       });
+
+      if (achievement) {
+        setCurrentAchievement(achievement);
+        setTimeout(() => setCurrentAchievement(null), 3500);
+      }
     });
 
     socket.on('round-reset', ({ currentRound, isReVote }: { currentRound: number; isReVote: boolean }) => {
@@ -215,12 +225,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on('session-expired', () => {
+    socket.on('session-expired', ({ summary }: { summary?: SessionSummary } = {}) => {
+      if (summary) {
+        setSessionSummary(summary);
+      }
       setState(null);
       setCurrentPlayerId(null);
       setSelectedCard(null);
       clearStoredSession();
-      setError('Session has ended.');
+      if (!summary) {
+        setError('Session has ended.');
+      }
     });
 
     // On every socket connection (initial + reconnections), re-join the
@@ -422,7 +437,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const endSession = useCallback(() => {
     if (!state) return;
-    socket.emit('end-session', { sessionId: state.sessionId }, () => {
+    socket.emit('end-session', { sessionId: state.sessionId }, (response: any) => {
+      if (response.summary) {
+        setSessionSummary(response.summary);
+      }
       clearStoredSession();
       setState(null);
       setCurrentPlayerId(null);
@@ -496,9 +514,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const clearMissedRounds = useCallback(() => setMissedRounds(0), []);
+  const clearSessionSummary = useCallback(() => setSessionSummary(null), []);
 
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds }}>
+    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, clearSessionSummary }}>
       {children}
     </GameContext.Provider>
   );
