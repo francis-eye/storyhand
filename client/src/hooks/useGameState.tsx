@@ -22,7 +22,7 @@ interface SocketResponse<T = undefined> {
 
 interface CreateSessionData {
   sessionId: string;
-  hostId: string;
+  facilitatorId: string;
   gameState: GameState;
 }
 
@@ -45,7 +45,8 @@ interface GameActions {
   startNewRound: () => void;
   reVote: () => void;
   removePlayer: (playerId: string) => void;
-  transferHost: (newHostId: string) => void;
+  kickPlayer: (targetPlayerId: string) => void;
+  endSession: () => void;
   leaveGame: () => void;
   submitFeedback: (sentiment: number, comment: string) => void;
 }
@@ -57,6 +58,8 @@ interface GameContextValue {
   actions: GameActions;
   error: string | null;
   isReconnecting: boolean;
+  missedRounds: number;
+  clearMissedRounds: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -77,9 +80,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return !!(pathMatch && pathMatch[1] === storedSessionId);
   });
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
+  const [missedRounds, setMissedRounds] = useState<number>(0);
 
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
+
+  useEffect(() => {
+    gameStateRef.current = state;
+  }, [state]);
 
   // ── Socket Connection ─────────────────────────────────────────────────────
   // The socket is a module-scope singleton (above). ensureConnected just
@@ -206,28 +215,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    socket.on('host-transferred', ({ oldHostId, newHostId }: { oldHostId: string; newHostId: string }) => {
-      setState(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          hostId: newHostId,
-          players: prev.players.map(p => {
-            if (p.id === oldHostId) return { ...p, role: 'player' as Role };
-            if (p.id === newHostId) return { ...p, role: 'host' as Role };
-            return p;
-          }),
-        };
-      });
-    });
-
     socket.on('session-expired', () => {
       setState(null);
       setCurrentPlayerId(null);
       setSelectedCard(null);
       sessionStorage.removeItem('storyhand-sessionId');
       sessionStorage.removeItem('storyhand-playerId');
-      setError('Session has ended — the host left.');
+      setError('Session has ended.');
     });
 
     // On every socket connection (initial + reconnections), re-join the
@@ -266,7 +260,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       socket.off('phase-changed');
       socket.off('player-disconnected');
       socket.off('player-reconnected');
-      socket.off('host-transferred');
       socket.off('session-expired');
       socket.off('connect');
       if (countdownRef.current) clearInterval(countdownRef.current);
@@ -300,6 +293,53 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ensureConnected]);
 
+  // ── Page Visibility API ──────────────────────────────────────────────────
+  // When the user returns to the tab after backgrounding, reconnect if needed.
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const storedSessionId = sessionStorage.getItem('storyhand-sessionId');
+      const storedPlayerId = sessionStorage.getItem('storyhand-playerId');
+      if (!storedSessionId || !storedPlayerId) return;
+
+      if (socket.connected && gameStateRef.current) return;
+
+      if (!socket.connected) {
+        socket.connect();
+      }
+
+      socket.emit(
+        'reconnect-session',
+        { sessionId: storedSessionId, playerId: storedPlayerId },
+        (response: any) => {
+          if (response.error || !response.success || !response.data) {
+            sessionStorage.removeItem('storyhand-sessionId');
+            sessionStorage.removeItem('storyhand-playerId');
+          } else {
+            const prevRound = gameStateRef.current?.currentRound;
+            setState(response.data.gameState);
+            const currentPlayer = response.data.gameState.players.find(
+              (p: any) => p.id === storedPlayerId
+            );
+            if (currentPlayer) {
+              setCurrentPlayerId(storedPlayerId);
+            }
+            if (prevRound && response.data.gameState.currentRound > prevRound) {
+              setMissedRounds(response.data.gameState.currentRound - prevRound);
+            }
+          }
+        }
+      );
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const createGame = useCallback((settings: GameSettings, hostName: string): Promise<string> => {
@@ -315,11 +355,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const { sessionId, hostId, gameState } = response.data;
+        const { sessionId, facilitatorId, gameState } = response.data;
         setState(gameState);
-        setCurrentPlayerId(hostId);
+        setCurrentPlayerId(facilitatorId);
         sessionStorage.setItem('storyhand-sessionId', sessionId);
-        sessionStorage.setItem('storyhand-playerId', hostId);
+        sessionStorage.setItem('storyhand-playerId', facilitatorId);
         resolve(sessionId);
       });
     });
@@ -377,11 +417,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.emit('re-vote', { sessionId: state.sessionId });
   }, [state]);
 
-  const transferHost = useCallback((newHostId: string) => {
+  const kickPlayer = useCallback((targetPlayerId: string) => {
     if (!state) return;
-    socket.emit('transfer-host', {
+    socket.emit('kick-player', {
       sessionId: state.sessionId,
-      newHostId,
+      targetPlayerId,
+    });
+  }, [state]);
+
+  const endSession = useCallback(() => {
+    if (!state) return;
+    socket.emit('end-session', { sessionId: state.sessionId }, () => {
+      sessionStorage.removeItem('storyhand-sessionId');
+      sessionStorage.removeItem('storyhand-playerId');
+      setState(null);
+      setCurrentPlayerId(null);
+      setSelectedCard(null);
     });
   }, [state]);
 
@@ -445,13 +496,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
     startNewRound,
     reVote,
     removePlayer,
-    transferHost,
+    kickPlayer,
+    endSession,
     leaveGame,
     submitFeedback,
   };
 
+  const clearMissedRounds = useCallback(() => setMissedRounds(0), []);
+
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting }}>
+    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds }}>
       {children}
     </GameContext.Provider>
   );

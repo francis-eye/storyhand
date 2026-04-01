@@ -15,6 +15,8 @@ const io = new Server(httpServer, {
   // In production, client and server are same-origin (Express serves the React build),
   // so CORS is not needed. In dev, whitelist the Vite dev server.
   cors: isProduction ? false : { origin: ['http://localhost:5173'] },
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 const sessionManager = new SessionManager();
@@ -53,15 +55,15 @@ io.on('connection', (socket) => {
 
     // Store session/player info on the socket for disconnect handling
     socket.data.sessionId = result.sessionId;
-    socket.data.playerId = result.hostId;
+    socket.data.playerId = result.facilitatorId;
 
     // Set the socket ID on the player
-    sessionManager.setSocketId(result.sessionId, result.hostId, socket.id);
+    sessionManager.setSocketId(result.sessionId, result.facilitatorId, socket.id);
 
     // Join the Socket.IO room for this session
     socket.join(result.sessionId);
 
-    console.log(`Session ${result.sessionId} created by ${hostName} (host: ${result.hostId})`);
+    console.log(`Session ${result.sessionId} created by ${hostName} (facilitator: ${result.facilitatorId})`);
 
     callback({ success: true, data: result });
   });
@@ -106,6 +108,20 @@ io.on('connection', (socket) => {
     // ALWAYS join the room first, unconditionally, before ANY other logic.
     socket.join(sessionId);
 
+    // Multi-tab deduplication: disconnect old socket for this player
+    const session = sessionManager.getSession(sessionId);
+    if (session) {
+      const existingPlayer = session.players.get(playerId);
+      if (existingPlayer && existingPlayer.socketId && existingPlayer.socketId !== socket.id) {
+        const existingSocket = io.sockets.sockets.get(existingPlayer.socketId);
+        if (existingSocket) {
+          existingSocket.data = {};
+          existingSocket.disconnect(true);
+          console.log(`[reconnect] Disconnected old socket ${existingPlayer.socketId} for player ${playerId} (multi-tab dedup)`);
+        }
+      }
+    }
+
     const result = sessionManager.reconnectPlayer(sessionId, playerId, socket.id);
     console.log(`[reconnect] reconnectPlayer result:`, result);
 
@@ -137,26 +153,27 @@ io.on('connection', (socket) => {
 
     // Broadcast to ALL clients in the room (including sender for consistency)
     io.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
+
+    if (result.autoReveal) {
+      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players });
+    }
   });
 
-  // --- Reveal cards (host only) ---
+  // --- Reveal cards ---
   socket.on('reveal-cards', ({ sessionId }) => {
-    const playerId = socket.data.playerId;
-    const result = sessionManager.revealCards(sessionId, playerId);
+    const result = sessionManager.revealCards(sessionId);
 
     if (result.error) {
       console.error(`reveal-cards error: ${result.error}`);
       return;
     }
 
-    // Broadcast with full vote data to all clients
     io.to(sessionId).emit('cards-revealed', { players: result.players });
   });
 
-  // --- New round (host only) ---
+  // --- New round ---
   socket.on('new-round', ({ sessionId }) => {
-    const playerId = socket.data.playerId;
-    const result = sessionManager.newRound(sessionId, playerId);
+    const result = sessionManager.newRound(sessionId);
 
     if (result.error) {
       console.error(`new-round error: ${result.error}`);
@@ -169,10 +186,9 @@ io.on('connection', (socket) => {
     });
   });
 
-  // --- Re-vote (host only) ---
+  // --- Re-vote ---
   socket.on('re-vote', ({ sessionId }) => {
-    const playerId = socket.data.playerId;
-    const result = sessionManager.reVote(sessionId, playerId);
+    const result = sessionManager.reVote(sessionId);
 
     if (result.error) {
       console.error(`re-vote error: ${result.error}`);
@@ -183,23 +199,6 @@ io.on('connection', (socket) => {
       currentRound: result.currentRound,
       isReVote: true,
     });
-  });
-
-  // --- Transfer host ---
-  socket.on('transfer-host', ({ sessionId, newHostId }) => {
-    const playerId = socket.data.playerId;
-    const result = sessionManager.transferHost(sessionId, playerId, newHostId);
-
-    if (result.error) {
-      console.error(`transfer-host error: ${result.error}`);
-      return;
-    }
-
-    io.to(sessionId).emit('host-transferred', {
-      oldHostId: result.oldHostId,
-      newHostId: result.newHostId,
-    });
-    console.log(`Host transferred from ${result.oldHostId} to ${result.newHostId} in session ${sessionId}`);
   });
 
   // --- Leave session ---
@@ -217,24 +216,60 @@ io.on('connection', (socket) => {
     socket.data.playerId = null;
 
     if (result.sessionDestroyed) {
-      // No one to promote — tell everyone the session is over
       io.to(sessionId).emit('session-expired', {});
-      console.log(`Session ${sessionId} destroyed (host left, no players to promote)`);
+      console.log(`Session ${sessionId} destroyed (no players remaining)`);
     } else {
       io.to(sessionId).emit('player-left', { playerId });
-      // If host left but another player was promoted, broadcast the transfer
-      if (result.newHostId) {
-        io.to(sessionId).emit('host-transferred', {
-          oldHostId: playerId,
-          newHostId: result.newHostId,
-        });
-        console.log(`Host left session ${sessionId}, promoted ${result.newHostId} to host`);
-      } else {
-        console.log(`Player ${playerId} left session ${sessionId}`);
+      console.log(`Player ${playerId} left session ${sessionId}`);
+    }
+
+    if (typeof callback === 'function') callback({ success: true });
+  });
+
+  // --- Kick player (facilitator only) ---
+  socket.on('kick-player', ({ sessionId, targetPlayerId }, callback) => {
+    const requesterId = socket.data.playerId;
+    const result = sessionManager.kickPlayer(sessionId, requesterId, targetPlayerId);
+
+    if (result.error) {
+      console.error(`kick-player error: ${result.error}`);
+      if (typeof callback === 'function') callback({ success: false, error: result.error });
+      return;
+    }
+
+    io.to(sessionId).emit('player-left', { playerId: targetPlayerId });
+    console.log(`Facilitator kicked player ${targetPlayerId} from session ${sessionId}`);
+
+    if (result.autoReveal) {
+      io.to(sessionId).emit('cards-revealed', { players: result.autoReveal.players });
+    }
+
+    // Force-disconnect the kicked player's socket
+    for (const [, s] of io.sockets.sockets) {
+      if (s.data.playerId === targetPlayerId && s.data.sessionId === sessionId) {
+        s.data = {};
+        s.disconnect(true);
+        break;
       }
     }
 
-    // Acknowledge so client can safely disconnect after server processes the leave
+    if (typeof callback === 'function') callback({ success: true });
+  });
+
+  // --- End session (facilitator only) ---
+  socket.on('end-session', ({ sessionId }, callback) => {
+    const requesterId = socket.data.playerId;
+    const result = sessionManager.endSession(sessionId, requesterId);
+
+    if (result.error) {
+      console.error(`end-session error: ${result.error}`);
+      if (typeof callback === 'function') callback({ success: false, error: result.error });
+      return;
+    }
+
+    io.to(sessionId).emit('session-expired', {});
+    console.log(`Facilitator ended session ${sessionId}`);
+
     if (typeof callback === 'function') callback({ success: true });
   });
 
@@ -302,7 +337,6 @@ io.on('connection', (socket) => {
     if (result) {
       io.to(sessionId).emit('player-disconnected', { playerId });
       console.log(`[disconnect] Player ${playerId} disconnected from session ${sessionId}`);
-      // Host promotion is now delayed (5s) and broadcast via onBroadcast callback
     }
   });
 });

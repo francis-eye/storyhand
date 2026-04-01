@@ -23,9 +23,6 @@ describe('SessionManager', () => {
     for (const timer of sm.disconnectTimers.values()) {
       clearTimeout(timer);
     }
-    for (const timer of sm.hostPromoteTimers.values()) {
-      clearTimeout(timer);
-    }
     vi.useRealTimers();
   });
 
@@ -36,13 +33,13 @@ describe('SessionManager', () => {
       const result = sm.createSession(defaultSettings, 'Alice');
 
       expect(result.sessionId).toMatch(/^[0-9A-F]{6}$/);
-      expect(result.hostId).toBeTruthy();
+      expect(result.facilitatorId).toBeTruthy();
       expect(result.gameState).toBeTruthy();
       expect(result.gameState.settings.gameName).toBe('Test Game');
       expect(result.gameState.phase).toBe('voting');
       expect(result.gameState.currentRound).toBe(1);
       expect(result.gameState.players).toHaveLength(1);
-      expect(result.gameState.players[0].role).toBe('host');
+      expect(result.gameState.players[0].role).toBe('facilitator');
       expect(result.gameState.players[0].name).toBe('Alice');
     });
 
@@ -97,7 +94,7 @@ describe('SessionManager', () => {
 
   describe('getGameState', () => {
     it('hides votes during voting phase', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.playCard(sessionId, playerId, 5);
 
@@ -108,10 +105,10 @@ describe('SessionManager', () => {
     });
 
     it('shows votes during revealed phase', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.playCard(sessionId, playerId, 8);
-      sm.revealCards(sessionId, hostId);
+      sm.revealCards(sessionId);
 
       const state = sm.getGameState(sessionId);
       const bob = state.players.find(p => p.id === playerId);
@@ -133,21 +130,20 @@ describe('SessionManager', () => {
       expect(sm.getGameState(sessionId).players).toHaveLength(1);
     });
 
-    it('promotes another player when host leaves', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+    it('removes facilitator without promotion, leaving remaining players', () => {
+      const { sessionId, facilitatorId } = sm.createSession(defaultSettings, 'Host');
       sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      const result = sm.leaveSession(sessionId, hostId);
+      const result = sm.leaveSession(sessionId, facilitatorId);
 
       expect(result.sessionDestroyed).toBe(false);
-      expect(result.newHostId).toBeTruthy();
       const state = sm.getGameState(sessionId);
       expect(state.players).toHaveLength(1);
-      expect(state.players[0].role).toBe('host');
+      expect(state.players[0].name).toBe('Bob');
     });
 
-    it('destroys session when host leaves and no players available', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
-      const result = sm.leaveSession(sessionId, hostId);
+    it('destroys session when last player leaves', () => {
+      const { sessionId, facilitatorId } = sm.createSession(defaultSettings, 'Host');
+      const result = sm.leaveSession(sessionId, facilitatorId);
 
       expect(result.sessionDestroyed).toBe(true);
       expect(sm.getGameState(sessionId)).toBeNull();
@@ -163,11 +159,12 @@ describe('SessionManager', () => {
       const result = sm.playCard(sessionId, playerId, 5);
 
       expect(result.hasVoted).toBe(true);
+      expect(result.playerId).toBe(playerId);
     });
 
-    it('allows the host to vote', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
-      const result = sm.playCard(sessionId, hostId, 13);
+    it('allows the facilitator to vote', () => {
+      const { sessionId, facilitatorId } = sm.createSession(defaultSettings, 'Host');
+      const result = sm.playCard(sessionId, facilitatorId, 13);
 
       expect(result.hasVoted).toBe(true);
     });
@@ -197,9 +194,9 @@ describe('SessionManager', () => {
     });
 
     it('rejects votes outside voting phase', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      sm.revealCards(sessionId, hostId);
+      sm.revealCards(sessionId);
 
       const result = sm.playCard(sessionId, playerId, 5);
       expect(result.error).toBe('Not in voting phase');
@@ -208,111 +205,49 @@ describe('SessionManager', () => {
 
   describe('revealCards', () => {
     it('reveals all votes', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId, facilitatorId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.playCard(sessionId, playerId, 8);
-      sm.playCard(sessionId, hostId, 5);
+      sm.playCard(sessionId, facilitatorId, 5);
 
-      const result = sm.revealCards(sessionId, hostId);
+      const result = sm.revealCards(sessionId);
       expect(result.players).toBeTruthy();
 
       const bob = result.players.find(p => p.id === playerId);
       expect(bob.vote).toBe(8);
-      const host = result.players.find(p => p.id === hostId);
-      expect(host.vote).toBe(5);
-    });
-
-    it('rejects non-host', () => {
-      const { sessionId } = sm.createSession(defaultSettings, 'Host');
-      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      const result = sm.revealCards(sessionId, playerId);
-
-      expect(result.error).toBe('Only the host can reveal');
+      const facilitator = result.players.find(p => p.id === facilitatorId);
+      expect(facilitator.vote).toBe(5);
     });
   });
 
   describe('newRound', () => {
     it('increments round and resets votes', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.playCard(sessionId, playerId, 5);
-      sm.revealCards(sessionId, hostId);
+      sm.revealCards(sessionId);
 
-      const result = sm.newRound(sessionId, hostId);
+      const result = sm.newRound(sessionId);
       expect(result.currentRound).toBe(2);
 
       const state = sm.getGameState(sessionId);
       expect(state.phase).toBe('voting');
       expect(state.players.every(p => !p.hasVoted)).toBe(true);
     });
-
-    it('rejects non-host', () => {
-      const { sessionId } = sm.createSession(defaultSettings, 'Host');
-      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      expect(sm.newRound(sessionId, playerId).error).toBeTruthy();
-    });
   });
 
   describe('reVote', () => {
     it('resets votes without incrementing round', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Host');
+      const { sessionId } = sm.createSession(defaultSettings, 'Host');
       sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      sm.revealCards(sessionId, hostId);
+      sm.revealCards(sessionId);
 
-      const result = sm.reVote(sessionId, hostId);
+      const result = sm.reVote(sessionId);
       expect(result.currentRound).toBe(1);
       expect(result.isReVote).toBe(true);
 
       const state = sm.getGameState(sessionId);
       expect(state.phase).toBe('voting');
-    });
-  });
-
-  // --- Host transfer ---
-
-  describe('transferHost', () => {
-    it('swaps roles between host and player', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
-      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-
-      const result = sm.transferHost(sessionId, hostId, playerId);
-      expect(result.oldHostId).toBe(hostId);
-      expect(result.newHostId).toBe(playerId);
-
-      const state = sm.getGameState(sessionId);
-      expect(state.hostId).toBe(playerId);
-      expect(state.players.find(p => p.id === playerId).role).toBe('host');
-      expect(state.players.find(p => p.id === hostId).role).toBe('player');
-    });
-
-    it('rejects non-host requester', () => {
-      const { sessionId } = sm.createSession(defaultSettings, 'Alice');
-      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      expect(sm.transferHost(sessionId, playerId, playerId).error).toBeTruthy();
-    });
-
-    it('rejects transfer to observer', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
-      const { playerId } = sm.joinSession(sessionId, 'observer', undefined, 's1');
-      expect(sm.transferHost(sessionId, hostId, playerId).error).toBeTruthy();
-    });
-  });
-
-  describe('immediateHostPromote', () => {
-    it('promotes next connected player', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
-      const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
-
-      const result = sm.immediateHostPromote(sessionId, hostId);
-      expect(result.newHostId).toBe(playerId);
-
-      const state = sm.getGameState(sessionId);
-      expect(state.hostId).toBe(playerId);
-    });
-
-    it('returns null if no connected players', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
-      expect(sm.immediateHostPromote(sessionId, hostId)).toBeNull();
     });
   });
 
@@ -329,7 +264,7 @@ describe('SessionManager', () => {
       expect(bob.isConnected).toBe(false);
     });
 
-    it('auto-removes player after grace period', () => {
+    it('auto-removes player after 5-minute grace period', () => {
       const { sessionId } = sm.createSession(defaultSettings, 'Host');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.onBroadcast = vi.fn();
@@ -339,50 +274,26 @@ describe('SessionManager', () => {
       // Before grace period
       expect(sm.getGameState(sessionId).players).toHaveLength(2);
 
-      // After 2-minute grace period
-      vi.advanceTimersByTime(2 * 60 * 1000);
+      // After 5-minute grace period
+      vi.advanceTimersByTime(5 * 60 * 1000);
       expect(sm.getGameState(sessionId).players).toHaveLength(1);
       expect(sm.onBroadcast).toHaveBeenCalledWith(sessionId, 'player-left', { playerId });
     });
 
-    it('delays host promotion by 5 seconds when host disconnects', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
+    it('treats facilitator disconnect same as any other player', () => {
+      const { sessionId, facilitatorId } = sm.createSession(defaultSettings, 'Alice');
       const { playerId } = sm.joinSession(sessionId, 'player', 'Bob', 's1');
       sm.onBroadcast = vi.fn();
 
-      const result = sm.disconnectPlayer(sessionId, hostId);
-      // No immediate promotion
-      expect(result.promoted).toBeUndefined();
+      const result = sm.disconnectPlayer(sessionId, facilitatorId);
 
-      // Host is still host before 5s
-      let state = sm.getGameState(sessionId);
-      expect(state.hostId).toBe(hostId);
-
-      // After 5s, promotion fires
-      vi.advanceTimersByTime(5000);
-      state = sm.getGameState(sessionId);
-      expect(state.hostId).toBe(playerId);
-      expect(sm.onBroadcast).toHaveBeenCalledWith(sessionId, 'host-transferred', {
-        oldHostId: hostId,
-        newHostId: playerId,
-      });
-    });
-
-    it('cancels host promotion if host reconnects within 5 seconds', () => {
-      const { sessionId, hostId } = sm.createSession(defaultSettings, 'Alice');
-      sm.joinSession(sessionId, 'player', 'Bob', 's1');
-      sm.onBroadcast = vi.fn();
-
-      sm.disconnectPlayer(sessionId, hostId);
-
-      // Host reconnects after 2s (before the 5s timer)
-      vi.advanceTimersByTime(2000);
-      sm.reconnectPlayer(sessionId, hostId, 'new-socket');
-
-      // Advance past 5s — no promotion should fire
-      vi.advanceTimersByTime(5000);
+      // Facilitator is just marked as disconnected, no promotion
       const state = sm.getGameState(sessionId);
-      expect(state.hostId).toBe(hostId);
+      expect(state.facilitatorId).toBe(facilitatorId);
+      const facilitator = state.players.find(p => p.id === facilitatorId);
+      expect(facilitator.isConnected).toBe(false);
+
+      // No host-transferred broadcast
       expect(sm.onBroadcast).not.toHaveBeenCalledWith(
         sessionId, 'host-transferred', expect.anything()
       );
@@ -402,7 +313,7 @@ describe('SessionManager', () => {
       expect(bob.isConnected).toBe(true);
 
       // Advance past grace period — player should NOT be removed
-      vi.advanceTimersByTime(3 * 60 * 1000);
+      vi.advanceTimersByTime(6 * 60 * 1000);
       expect(sm.getGameState(sessionId).players).toHaveLength(2);
     });
   });
