@@ -23,31 +23,9 @@ export default function PlayerBar({
   onKickPlayer,
   theme,
 }: PlayerBarProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showFade, setShowFade] = useState(false);
-
   // Popover state
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-
-  // Check if scrollable content extends beyond the visible area
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const checkScroll = () => {
-      const hasMore = el.scrollWidth - el.scrollLeft - el.clientWidth > 2;
-      setShowFade(hasMore);
-    };
-
-    checkScroll();
-    el.addEventListener('scroll', checkScroll);
-    window.addEventListener('resize', checkScroll);
-    return () => {
-      el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('resize', checkScroll);
-    };
-  }, [players.length]);
 
   const handleAvatarClick = (event: React.MouseEvent<HTMLElement>, player: Player) => {
     setAnchorEl(event.currentTarget);
@@ -89,65 +67,90 @@ export default function PlayerBar({
   const containerBorder = theme.roster.border || 'border-[var(--player-bar-border)]';
   const nameText = theme.roster.nameText || 'text-[var(--text-primary)]';
 
+  const shouldMarquee = players.length > 6;
+
+  // Mobile touch pause for marquee
+  const [paused, setPaused] = useState(false);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTouch = () => {
+    setPaused(true);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => setPaused(false), 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, []);
+
+  const renderPlayerUnit = (player: Player, index: number, isSecondCopy = false) => (
+    <div key={`${player.id}-${isSecondCopy ? 'dup' : 'orig'}`} className="flex items-center gap-1.5 shrink-0">
+      {/* Dot separator */}
+      {(index > 0 || isSecondCopy) && (
+        <span className={`${nameText} opacity-30 ${isSecondCopy && index === 0 ? 'mx-3' : 'mr-1.5'} select-none`}>&middot;</span>
+      )}
+
+      {/* Player unit */}
+      <div
+        className={`flex items-center gap-1.5 ${
+          !player.isConnected ? 'opacity-40 grayscale' : ''
+        }`}
+      >
+        {/* Avatar */}
+        <button
+          onClick={(e) => handleAvatarClick(e, player)}
+          className="relative w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-shadow"
+          style={{ backgroundColor: stringToColor(player.name || 'Observer') }}
+          title={player.name || 'Observer'}
+        >
+          {(player.name || 'O').charAt(0).toUpperCase()}
+
+          {/* Facilitator star badge */}
+          {isFacilitator(player) && (
+            <span className="absolute -top-1 -right-1 text-[10px] leading-none drop-shadow-sm">
+              &#9733;
+            </span>
+          )}
+        </button>
+
+        {/* Name */}
+        <span
+          className={`text-sm whitespace-nowrap ${
+            player.isConnected ? nameText : theme.roster.nameDisconnectedText
+          }`}
+        >
+          {player.name || 'Observer'}
+        </span>
+
+        {/* Vote status */}
+        {getVoteStatus(player)}
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative">
       <div
-        ref={scrollRef}
-        className={`flex items-center gap-3 px-4 py-2.5 overflow-x-auto border-b ${containerBg} ${containerBorder}`}
-        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+        className={`border-b py-2.5 ${containerBg} ${containerBorder} ${shouldMarquee ? 'overflow-hidden' : 'px-4'}`}
+        style={shouldMarquee ? { maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)' } : undefined}
       >
-        {players.map((player, index) => (
-          <div key={player.id} className="flex items-center gap-1.5 shrink-0">
-            {/* Dot separator between players */}
-            {index > 0 && (
-              <span className={`${nameText} opacity-30 mr-1.5 select-none`}>&middot;</span>
-            )}
-
-            {/* Player unit */}
-            <div
-              className={`flex items-center gap-1.5 ${
-                !player.isConnected ? 'opacity-40 grayscale' : ''
-              }`}
-            >
-              {/* Avatar */}
-              <button
-                onClick={(e) => handleAvatarClick(e, player)}
-                className="relative w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-shadow"
-                style={{ backgroundColor: stringToColor(player.name || 'Observer') }}
-                title={player.name || 'Observer'}
-              >
-                {(player.name || 'O').charAt(0).toUpperCase()}
-
-                {/* Facilitator star badge */}
-                {isFacilitator(player) && (
-                  <span className="absolute -top-1 -right-1 text-[10px] leading-none drop-shadow-sm">
-                    &#9733;
-                  </span>
-                )}
-              </button>
-
-              {/* Name */}
-              <span
-                className={`text-sm whitespace-nowrap ${
-                  player.isConnected ? nameText : theme.roster.nameDisconnectedText
-                }`}
-              >
-                {player.name || 'Observer'}
-              </span>
-
-              {/* Vote status */}
-              {getVoteStatus(player)}
-            </div>
+        {shouldMarquee ? (
+          <div
+            className={`flex items-center gap-3 whitespace-nowrap px-4 animate-marquee ${paused ? 'pause-marquee' : ''}`}
+            style={{ animationDuration: `${players.length * 4}s` }}
+            onTouchStart={handleTouch}
+          >
+            {players.map((player, i) => renderPlayerUnit(player, i))}
+            {players.map((player, i) => renderPlayerUnit(player, i, true))}
           </div>
-        ))}
+        ) : (
+          <div className="flex items-center justify-center gap-3">
+            {players.map((player, i) => renderPlayerUnit(player, i))}
+          </div>
+        )}
       </div>
-
-      {/* Right-edge fade gradient when content overflows */}
-      {showFade && (
-        <div
-          className={`absolute right-0 top-0 bottom-0 w-8 pointer-events-none bg-gradient-to-l ${theme.deck.fadeGradient} to-transparent`}
-        />
-      )}
 
       {/* Player detail popover */}
       <Popover
