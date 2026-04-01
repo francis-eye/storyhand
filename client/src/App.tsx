@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { ColorModeProvider } from './hooks/useColorMode';
 import { GameProvider } from './hooks/useGameState';
 import { FeedbackProvider } from './hooks/useFeedback';
 import Header from './components/Header';
@@ -30,11 +31,13 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <GameProvider>
-        <FeedbackProvider>
-          <AppContent />
-        </FeedbackProvider>
-      </GameProvider>
+      <ColorModeProvider>
+        <GameProvider>
+          <FeedbackProvider>
+            <AppContent />
+          </FeedbackProvider>
+        </GameProvider>
+      </ColorModeProvider>
     </BrowserRouter>
   );
 }

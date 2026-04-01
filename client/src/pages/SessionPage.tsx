@@ -18,7 +18,7 @@ export default function SessionPage() {
   if (isReconnecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-gray-500">Reconnecting to session...</p>
+        <p className="text-gray-500 dark:text-gray-400">Reconnecting to session...</p>
       </div>
     );
   }
@@ -27,7 +27,7 @@ export default function SessionPage() {
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-gray-500">No active session found.</p>
+        <p className="text-gray-500 dark:text-gray-400">No active session found.</p>
         <button
           onClick={() => navigate('/')}
           className="text-blue-600 hover:underline"
@@ -54,7 +54,7 @@ export default function SessionPage() {
   return (
     <div className={`flex flex-col h-[calc(100vh-65px)] ${theme.wrapper}`}>
       {missedRounds > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center justify-between">
+        <div className="bg-blue-50 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800 px-4 py-2 flex items-center justify-between">
           <span className="text-sm text-blue-700">
             {missedRounds} round{missedRounds > 1 ? 's' : ''} completed while you were away
           </span>

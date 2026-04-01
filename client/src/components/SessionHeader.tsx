@@ -31,21 +31,25 @@ export default function SessionHeader({ gameName, sessionId, currentRound, phase
     setTimeout(() => setCopiedId(false), 2000);
   };
 
+  const headerBg = theme.header.background || 'bg-[var(--session-header-bg)] border-b border-[var(--border-default)]';
+  const gameNameColor = theme.header.gameName || 'text-[var(--text-primary)]';
+  const roundColor = theme.header.roundText || 'text-[var(--text-secondary)]';
+
   return (
-    <div className={`flex items-center flex-wrap px-3 py-1.5 gap-x-2 gap-y-1 ${theme.header.background}`}>
-      <h2 className={`text-base font-semibold truncate max-w-[150px] ${theme.header.gameName}`}>{gameName}</h2>
+    <div className={`flex items-center flex-wrap px-3 py-1.5 gap-x-2 gap-y-1 ${headerBg}`}>
+      <h2 className={`text-base font-semibold truncate max-w-[150px] ${gameNameColor}`}>{gameName}</h2>
 
-      <span className={`text-sm ${theme.header.roundText}`}>·</span>
-      <span className={`text-sm ${theme.header.roundText}`}>Round {currentRound}</span>
+      <span className={`text-sm ${roundColor}`}>·</span>
+      <span className={`text-sm ${roundColor}`}>Round {currentRound}</span>
 
-      <span className={`text-sm ${theme.header.roundText}`}>·</span>
+      <span className={`text-sm ${roundColor}`}>·</span>
       <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${phaseClasses}`}>
         {phase.charAt(0).toUpperCase() + phase.slice(1)}
       </span>
 
       {isReVoting && phase === 'voting' && (
         <>
-          <span className={`text-sm ${theme.header.roundText}`}>·</span>
+          <span className={`text-sm ${roundColor}`}>·</span>
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium animate-pulse ${theme.header.reVotingChip}`}>
             Re-voting...
           </span>

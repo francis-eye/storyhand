@@ -2,6 +2,82 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,900;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
+/* Tailwind v4: use class-based dark mode (syncs with .dark on <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===== Color Mode Variables ===== */
+:root {
+  --bg-primary: #F5F7FA;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F0F0F0;
+  --text-primary: #1A1A2E;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border-default: #E0E0E0;
+  --border-subtle: #F0F0F0;
+  --surface-elevated: #FFFFFF;
+  --input-bg: #FFFFFF;
+  --input-border: #CCCCCC;
+  --accent-primary: #3F51B5;
+  --accent-primary-hover: #303F9F;
+  --accent-secondary: #FF9800;
+  --success: #2E7D32;
+  --warning: #F57F17;
+  --error: #C62828;
+  --card-face-bg: #FFFFFF;
+  --card-face-border: #E0E0E0;
+  --card-back-from: #4338ca;
+  --card-back-to: #7c3aed;
+  --deck-tray-bg: #FFFFFF;
+  --deck-tray-border: #E0E0E0;
+  --controls-bg: #FFFFFF;
+  --controls-border: #E0E0E0;
+  --player-bar-bg: #FFFFFF;
+  --player-bar-border: #E0E0E0;
+  --results-bg: #FFFFFF;
+  --results-border: #E0E0E0;
+  --header-bg: #FFFFFF;
+  --session-header-bg: #FFFFFF;
+  --chip-bg: #F0F0F0;
+  --chip-text: #333333;
+}
+
+.dark {
+  --bg-primary: #0F0F1A;
+  --bg-secondary: #1A1A2E;
+  --bg-tertiary: #252540;
+  --text-primary: #E8E8F0;
+  --text-secondary: #A0A0B8;
+  --text-muted: #6B6B80;
+  --border-default: #2E2E45;
+  --border-subtle: #1F1F35;
+  --surface-elevated: #1F1F35;
+  --input-bg: #252540;
+  --input-border: #3A3A55;
+  --accent-primary: #5C6BC0;
+  --accent-primary-hover: #7986CB;
+  --accent-secondary: #FFB74D;
+  --success: #4CAF50;
+  --warning: #FFB74D;
+  --error: #EF5350;
+  --card-face-bg: #1F1F35;
+  --card-face-border: #3A3A55;
+  --card-back-from: #4338ca;
+  --card-back-to: #7c3aed;
+  --deck-tray-bg: #151528;
+  --deck-tray-border: #2E2E45;
+  --controls-bg: #151528;
+  --controls-border: #2E2E45;
+  --player-bar-bg: #1A1A2E;
+  --player-bar-border: #2E2E45;
+  --results-bg: #1A1A2E;
+  --results-border: #2E2E45;
+  --header-bg: #12121f;
+  --session-header-bg: #1A1A2E;
+  --chip-bg: #252540;
+  --chip-text: #C0C0D0;
+}
+
 /* 16-bit pixel font utility */
 .font-pixel {
   font-family: 'Press Start 2P', cursive;

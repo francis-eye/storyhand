@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import { useFeedback } from '../hooks/useFeedback';
+import DarkModeToggle from './DarkModeToggle';
 
 // App header with Storyhand logo and navigation
 export default function Header() {
@@ -17,7 +18,7 @@ export default function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+    <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white dark:bg-[#12121f] dark:border-gray-700">
       <button
         onClick={inSession ? handleExit : () => navigate('/')}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
@@ -30,6 +31,7 @@ export default function Header() {
       </button>
 
       <div className="flex items-center gap-2">
+        <DarkModeToggle />
         {!isLanding && (
           <button
             onClick={openFeedback}

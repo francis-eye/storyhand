@@ -85,18 +85,22 @@ export default function PlayerBar({
     return <span className="text-gray-400 text-xs">Thinking...</span>;
   };
 
+  const containerBg = theme.roster.background || 'bg-[var(--player-bar-bg)]';
+  const containerBorder = theme.roster.border || 'border-[var(--player-bar-border)]';
+  const nameText = theme.roster.nameText || 'text-[var(--text-primary)]';
+
   return (
     <div className="relative">
       <div
         ref={scrollRef}
-        className={`flex items-center gap-3 px-4 py-2.5 overflow-x-auto border-b ${theme.roster.background} ${theme.roster.border}`}
+        className={`flex items-center gap-3 px-4 py-2.5 overflow-x-auto border-b ${containerBg} ${containerBorder}`}
         style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
       >
         {players.map((player, index) => (
           <div key={player.id} className="flex items-center gap-1.5 shrink-0">
             {/* Dot separator between players */}
             {index > 0 && (
-              <span className={`${theme.roster.nameText} opacity-30 mr-1.5 select-none`}>&middot;</span>
+              <span className={`${nameText} opacity-30 mr-1.5 select-none`}>&middot;</span>
             )}
 
             {/* Player unit */}
@@ -125,7 +129,7 @@ export default function PlayerBar({
               {/* Name */}
               <span
                 className={`text-sm whitespace-nowrap ${
-                  player.isConnected ? theme.roster.nameText : theme.roster.nameDisconnectedText
+                  player.isConnected ? nameText : theme.roster.nameDisconnectedText
                 }`}
               >
                 {player.name || 'Observer'}
@@ -154,7 +158,14 @@ export default function PlayerBar({
         transformOrigin={{ vertical: 'top', horizontal: 'center' }}
         slotProps={{
           paper: {
-            sx: { borderRadius: '12px', mt: 1, minWidth: 180 },
+            sx: {
+              borderRadius: '12px',
+              mt: 1,
+              minWidth: 180,
+              bgcolor: 'var(--surface-elevated)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-default)',
+            },
           },
         }}
       >
@@ -162,10 +173,10 @@ export default function PlayerBar({
           <div className="p-3 flex flex-col gap-2">
             {/* Player name and role */}
             <div>
-              <p className="font-semibold text-sm text-gray-800">
+              <p className="font-semibold text-sm text-[var(--text-primary)]">
                 {selectedPlayer.name || 'Observer'}
               </p>
-              <p className="text-xs text-gray-500">{getRoleLabel(selectedPlayer)}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{getRoleLabel(selectedPlayer)}</p>
             </div>
 
             {/* Connection status */}
@@ -175,7 +186,7 @@ export default function PlayerBar({
                   selectedPlayer.isConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}
               />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-[var(--text-secondary)]">
                 {selectedPlayer.isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
@@ -184,7 +195,7 @@ export default function PlayerBar({
             {isCurrentUserFacilitator && !isFacilitator(selectedPlayer) && onKickPlayer && (
               <button
                 onClick={handleKick}
-                className="mt-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md px-2 py-1.5 transition-colors text-left cursor-pointer"
+                className="mt-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md px-2 py-1.5 transition-colors text-left cursor-pointer"
               >
                 Kick Player
               </button>
