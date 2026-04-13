@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import SessionHeader from '../components/SessionHeader';
-import PlayerBar from '../components/PlayerBar';
+import VoteStatusSummary from '../components/VoteStatusSummary';
 import GameTable from '../components/GameTable';
 import CardDeck from '../components/CardDeck';
 import GameControls from '../components/GameControls';
@@ -92,8 +92,8 @@ export default function SessionPage() {
         consensusStreak={state.consensusStreak}
       />
 
-      {/* Player bar — replaces sidebar roster */}
-      <PlayerBar
+      {/* Vote status summary with expandable roster */}
+      <VoteStatusSummary
         players={state.players}
         facilitatorId={state.facilitatorId}
         showVoteStatus={state.phase === 'voting' || state.phase === 'countdown'}
