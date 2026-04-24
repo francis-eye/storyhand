@@ -16,7 +16,7 @@ export default function CreateGamePage() {
   const [showAverage, setShowAverage] = useState(true);
   const [showCountdown, setShowCountdown] = useState(true);
   const [inactivityTimeout, setInactivityTimeout] = useState(30);
-  const [tableTheme, setTableTheme] = useState<TableTheme>('classic');
+  const [tableTheme, setTableTheme] = useState<TableTheme>('16bit');
 
   const canCreate = gameName.trim() && hostName.trim();
 

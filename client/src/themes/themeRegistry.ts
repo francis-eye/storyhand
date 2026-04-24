@@ -98,7 +98,7 @@ export interface ThemeConfig {
 
 const classicTheme: ThemeConfig = {
   id: 'classic',
-  label: 'Classic (Default)',
+  label: 'Classic',
   icon: '🎨',
   wrapper: '',
   header: {
@@ -188,7 +188,7 @@ const classicTheme: ThemeConfig = {
 
 const sixteenBitTheme: ThemeConfig = {
   id: '16bit',
-  label: '16-Bit Mode',
+  label: '16-Bit Mode (Default)',
   icon: '🕹️',
   wrapper: 'font-pixel theme-16bit',
   header: {
