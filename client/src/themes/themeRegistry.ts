@@ -20,6 +20,10 @@ export interface ThemeConfig {
     sessionIdButton: string;
     sessionIdText: string;
   };
+  // Gaming area floor (space around the felt, between status bar and card deck)
+  gamingArea: {
+    background: string;
+  };
   // Game table
   table: {
     background: string;
@@ -114,8 +118,11 @@ const classicTheme: ThemeConfig = {
     sessionIdButton: 'bg-white dark:bg-[var(--surface-elevated)] border border-gray-200 dark:border-[var(--border-default)] hover:bg-gray-50 dark:hover:bg-[var(--bg-tertiary)]',
     sessionIdText: 'text-gray-700 dark:text-gray-300',
   },
+  gamingArea: {
+    background: 'bg-emerald-50 dark:bg-emerald-800',
+  },
   table: {
-    background: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-950 dark:to-emerald-900',
+    background: 'bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900',
     border: 'border border-emerald-200 dark:border-emerald-800 rounded-2xl',
     emptyText: 'text-emerald-400',
     voteCountText: 'text-gray-500 dark:text-gray-400',
@@ -201,8 +208,11 @@ const sixteenBitTheme: ThemeConfig = {
     sessionIdButton: 'bg-[#1a1a2e] border-2 border-[#33ff33]/40 hover:border-[#33ff33]/70',
     sessionIdText: 'text-[#33ff33]',
   },
+  gamingArea: {
+    background: 'bg-[#3a7a3a] dark:bg-[#2a5a2a]',
+  },
   table: {
-    background: 'bg-[#1a3a1a]',
+    background: 'bg-[#2a6a2a] dark:bg-[#1a3a1a]',
     border: 'border-4 border-[#0d2a0d] rounded-none',
     emptyText: 'text-[#33ff33]/50',
     voteCountText: 'text-[#33ff33]/70',

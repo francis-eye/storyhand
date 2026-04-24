@@ -103,7 +103,7 @@ export default function SessionPage() {
       />
 
       {/* Game table — takes all remaining vertical space */}
-      <div className="flex-1 min-h-0 overflow-auto relative">
+      <div className={`flex-1 min-h-0 overflow-auto relative ${theme.gamingArea.background}`}>
         <GameTable
           players={state.players}
           phase={state.phase}
