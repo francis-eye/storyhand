@@ -418,6 +418,14 @@ export default function LandingPage() {
             <button onClick={() => navigate('/privacy')} className="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
               Privacy
             </button>
+            <a
+              href="https://github.com/sponsors/francis-eye"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            >
+              ♥ Sponsor
+            </a>
             <a href="https://github.com/francis-eye/storyhand" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
               GitHub
             </a>
