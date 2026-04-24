@@ -277,8 +277,8 @@ const sixteenBitTheme: ThemeConfig = {
 };
 
 const THEMES: Record<TableTheme, ThemeConfig> = {
-  classic: classicTheme,
   '16bit': sixteenBitTheme,
+  classic: classicTheme,
 };
 
 export function getTheme(id: TableTheme): ThemeConfig {
