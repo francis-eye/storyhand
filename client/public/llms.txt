@@ -33,9 +33,9 @@ Storyhand is designed for distributed agile teams running sprint planning, refin
 
 ## Useful URLs
 
-- Live app: https://storyhand.up.railway.app
+- Live app: https://storyhand-production.up.railway.app
 - Source: https://github.com/francis-eye/storyhand
-- Privacy policy: https://storyhand.up.railway.app/privacy
+- Privacy policy: https://storyhand-production.up.railway.app/privacy
 - Sponsor: https://github.com/sponsors/francis-eye
 
 ## Stack

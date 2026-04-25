@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://storyhand.up.railway.app/</loc>
+    <loc>https://storyhand-production.up.railway.app/</loc>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://storyhand.up.railway.app/create</loc>
+    <loc>https://storyhand-production.up.railway.app/create</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://storyhand.up.railway.app/join</loc>
+    <loc>https://storyhand-production.up.railway.app/join</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://storyhand.up.railway.app/privacy</loc>
+    <loc>https://storyhand-production.up.railway.app/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

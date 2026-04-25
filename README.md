@@ -4,7 +4,7 @@
 
 Deal out story points with confidence. No sign-up required — create a session in seconds and start estimating.
 
-**[Try it live](https://storyhand.up.railway.app)**
+**[Try it live](https://storyhand-production.up.railway.app)**
 
 ---
 

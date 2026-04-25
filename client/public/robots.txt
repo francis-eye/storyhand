@@ -6,4 +6,4 @@ Allow: /privacy
 Disallow: /session/
 Disallow: /api/
 
-Sitemap: https://storyhand.up.railway.app/sitemap.xml
+Sitemap: https://storyhand-production.up.railway.app/sitemap.xml
