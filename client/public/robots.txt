@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /create
+Allow: /join
+Allow: /privacy
+Disallow: /session/
+Disallow: /api/
+
+Sitemap: https://storyhand.up.railway.app/sitemap.xml

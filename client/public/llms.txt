@@ -1,0 +1,47 @@
+# Storyhand
+
+> Real-time planning poker for distributed teams. No accounts, no downloads. Create a session in seconds, vote on story points, reveal together.
+
+Storyhand is a free, open-source, browser-based planning poker tool for agile teams. A host creates an estimation session, shares a 6-character session ID, and team members join to vote on story points using a Fibonacci card deck (0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, ?, ☕). Votes are masked until the host reveals them simultaneously. There are no user accounts, no databases, and no persistent data — every session is purged when it expires.
+
+Storyhand is designed for distributed agile teams running sprint planning, refinement, or story-pointing sessions over Zoom/Slack/Meet. It works on desktop and mobile browsers and ships in two visual modes: a clean modern theme and a 16-bit retro theme inspired by Balatro.
+
+## How it works
+
+- A host creates a game with a name, a voting system (Fibonacci), and optional advanced settings (auto-reveal, countdown, inactivity timeout, table theme).
+- The system generates a cryptographic 6-character Session ID.
+- The host shares the session ID with their team via Slack, Zoom, email, or a direct invite link.
+- Players and observers join by entering the Session ID and choosing a role (Player can vote; Observer watches only).
+- During a round, players select a card from the deck. Votes are face-down and hidden from everyone — including the server's broadcast — until reveal.
+- The host clicks "Reveal Cards." A 3-2-1 countdown plays, then all votes flip simultaneously.
+- The team sees the average, vote distribution, and a consensus indicator. The host can re-vote on the same item or start a new round.
+
+## Key features
+
+- Real-time multiplayer via Socket.IO (instant card flips, live presence)
+- Fibonacci card deck with `?` (unsure) and `☕` (AFK) cards excluded from the average
+- Two visual themes: Classic and 16-Bit Mode (Balatro-inspired)
+- Auto-reveal when all players have voted (optional)
+- Disconnect grace period with automatic reconnection
+- Host transfer to any connected player
+- Player removal by the host
+- Light and dark color modes
+- Mobile-responsive
+- 50-player session cap
+- Daily activity stats on the landing page
+- Zero data collection — no cookies, no trackers, no accounts
+
+## Useful URLs
+
+- Live app: https://storyhand.up.railway.app
+- Source: https://github.com/francis-eye/storyhand
+- Privacy policy: https://storyhand.up.railway.app/privacy
+- Sponsor: https://github.com/sponsors/francis-eye
+
+## Stack
+
+React 19, TypeScript, Tailwind CSS v4, Material UI, Vite, Node.js, Express, Socket.IO. Hosted on Railway. Open source under MIT.
+
+## Author
+
+Built by Francis Interlandi as a learning project. Free to use forever; sponsorships cover the $5/mo hosting bill.

@@ -3,7 +3,64 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Storyhand</title>
+
+    <title>Storyhand — Real-time planning poker for distributed teams</title>
+    <meta name="description" content="Real-time planning poker for distributed teams. No accounts, no downloads. Create a session in seconds, vote on story points, reveal together." />
+    <meta name="keywords" content="planning poker, story points, agile estimation, scrum, sprint planning, remote team tool, fibonacci, retrospective" />
+    <meta name="author" content="Francis Interlandi" />
+    <meta name="theme-color" content="#1a3a1a" />
+    <link rel="canonical" href="https://storyhand.up.railway.app/" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Storyhand" />
+    <meta property="og:title" content="Storyhand — Real-time planning poker for distributed teams" />
+    <meta property="og:description" content="Real-time planning poker for distributed teams. No accounts, no downloads. Create a session in seconds, vote on story points, reveal together." />
+    <meta property="og:url" content="https://storyhand.up.railway.app/" />
+    <meta property="og:image" content="https://storyhand.up.railway.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Storyhand — real-time planning poker for distributed teams" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Storyhand — Real-time planning poker for distributed teams" />
+    <meta name="twitter:description" content="Real-time planning poker for distributed teams. No accounts, no downloads. Create a session in seconds, vote on story points, reveal together." />
+    <meta name="twitter:image" content="https://storyhand.up.railway.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Storyhand — real-time planning poker for distributed teams" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Storyhand",
+      "url": "https://storyhand.up.railway.app/",
+      "description": "Real-time planning poker for distributed teams. No accounts, no downloads. Create a session in seconds, vote on story points, reveal together.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "browserRequirements": "Requires JavaScript and a modern web browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "creator": {
+        "@type": "Person",
+        "name": "Francis Interlandi"
+      },
+      "featureList": [
+        "Real-time multiplayer voting via Socket.IO",
+        "Fibonacci card deck",
+        "Auto-reveal when all players have voted",
+        "Host controls and host transfer",
+        "Light and dark color modes",
+        "Classic and 16-Bit retro themes",
+        "Mobile-responsive",
+        "No accounts, no data collection"
+      ]
+    }
+    </script>
   </head>
   <body>
     <script>
@@ -14,6 +71,15 @@
         if (isDark) document.documentElement.classList.add('dark');
       })();
     </script>
+    <noscript>
+      <div style="font-family: system-ui, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1.5rem; line-height: 1.6;">
+        <h1>Storyhand</h1>
+        <p><strong>Real-time planning poker for distributed teams.</strong></p>
+        <p>Storyhand is a no-signup, browser-based planning poker tool for agile teams. A host creates an estimation session, shares a Session ID, and team members vote on story points using a Fibonacci card deck. Votes are hidden until the host reveals them simultaneously.</p>
+        <p>This site requires JavaScript to run. Please enable JavaScript and reload, or visit on a modern browser.</p>
+        <p><a href="https://github.com/francis-eye/storyhand">Source code on GitHub</a> · <a href="/privacy">Privacy policy</a></p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
