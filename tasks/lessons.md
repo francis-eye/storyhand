@@ -201,3 +201,15 @@ No server code, no new Socket.IO events, no new handlers. This is a strength of 
 **Lesson:** The previous session had multiple production incidents from shipping untested code. This session had none because we followed the protocol: plan → implement → type-check → test locally → push. The extra 5 minutes of local testing saves hours of fix-deploy-fail cycles.
 
 **How to apply:** This is the protocol. No exceptions. The temptation to "just push it" is always wrong.
+
+---
+
+## 15. Verify the production URL by hitting it before baking it into anything durable
+
+**What happened:** Shipped the Phase 5 SEO + agentic-discovery foundation with the wrong canonical URL — `storyhand.up.railway.app` baked into 13 places (og:url, og:image, twitter:image, canonical link, JSON-LD `url`, four sitemap `<loc>` entries, robots.txt sitemap line, two llms.txt URLs, README live link). The actual Railway URL is `storyhand-production.up.railway.app`. Discovered when Slack refused to unfurl: every unfurler was fetching `storyhand.up.railway.app`, getting Railway's edge 404 (`x-railway-fallback: true`), and aborting. CLAUDE.md and the existing README both showed the wrong URL, so the assumption flowed straight through.
+
+**Root cause:** I trusted the README's "Try it live" link as authoritative without `curl -I`-ing it before referencing it across the codebase. The README itself had inherited the wrong URL silently — probably set up early when the Railway service was first named. Documentation drift compounded the error.
+
+**Lesson:** Whenever a URL, hostname, port, account name, or any other external identifier is going to be referenced in more than one file, hit the actual endpoint first. `curl -I https://...` takes one second and catches: typos, retired domains, wrong subdomains, expired certs, dead services. Don't propagate a string from documentation into code without proving the string resolves to the live thing.
+
+**How to apply:** Before writing meta tags, OG/Twitter cards, JSON-LD, sitemaps, robots.txt, llms.txt, README badges, deep links, OAuth redirect URIs, webhook destinations, or any other identifier that other systems will fetch — `curl -I` it first. Treat existing documentation references as unverified hints, not facts. If a value lives in 5+ places, it should also live in one place: a build-time constant or env var that makes future migrations one-line edits, not 13.

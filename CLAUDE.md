@@ -2,6 +2,18 @@
 
 Real-time story point estimation for distributed agile teams. Think planning poker, but lightweight — no accounts, no setup, no downloads.
 
+## gstack
+
+Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+
+**Available gstack skills:**
+- `/plan-ceo-review` — CEO-level plan review
+- `/plan-eng-review` — Engineering plan review
+- `/review` — Code review
+- `/ship` — Ship workflow
+- `/browse` — Web browsing (use this instead of MCP chrome tools)
+- `/retro` — Retrospective
+
 ## What We're Building
 
 A multiplayer web app where a Host creates an estimation session, shares a Session ID, and team members join to vote on story points using a Fibonacci card deck. Votes are masked until the Host reveals them simultaneously.
@@ -15,15 +27,17 @@ A multiplayer web app where a Host creates an estimation session, shares a Sessi
 - **Database:** None — all session data lives in memory and is purged on expiration
 - **Deployment:** Railway (auto-deploys from GitHub)
 
-## Current State (as of March 2026)
+## Current State (as of April 2026)
 
 ### What's Built — Everything is functional and deployed
 
-Phases 1–4 are complete. The app is fully playable with real-time multiplayer, deployed on Railway, and ready for team use.
+Phases 1–4 are complete. The app is fully playable with real-time multiplayer, deployed on Railway, and ready for team use. Phase 5 (SEO + agentic discovery foundation) is also live.
+
+**Live URL:** `https://storyhand-production.up.railway.app/` (canonical — note the `-production` segment; the bare `storyhand.up.railway.app` does NOT resolve).
 
 **Pages (5 pages):**
-- `LandingPage.tsx` — Hero with "Create Game" and "Join Game" CTAs, daily activity stats, footer with author credit and privacy policy link
-- `CreateGamePage.tsx` — Game name, host name, voting system, table theme dropdown, collapsible advanced settings (average, countdown, timeout slider)
+- `LandingPage.tsx` — Hero with "Create Game" and "Join Game" CTAs, daily activity stats, footer with Privacy / ♥ Sponsor (GitHub Sponsors) / GitHub links
+- `CreateGamePage.tsx` — Game name, host name, voting system, table theme dropdown (16-Bit Mode is the pre-selected default; Classic is the second option), collapsible advanced settings (average, countdown, timeout slider)
 - `JoinSessionPage.tsx` — Session ID input (6-char, uppercase), role selector cards (Player/Observer), conditional name field, error display for invalid sessions. Supports invite links via `/join/:sessionId` route (pre-fills session ID)
 - `SessionPage.tsx` — Full session layout with sidebar roster, game table, card deck (Players), host controls (Host). Mobile responsive (horizontal roster, compact table, scroll indicators). Themed via theme registry
 - `PrivacyPage.tsx` — Privacy policy covering data collection, storage, and sharing practices
@@ -74,6 +88,27 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 - `checkConsensus()` — true if all numeric votes are identical
 - `stringToColor()` — deterministic color from player name for avatar backgrounds
 
+**Theme registry (`themes/themeRegistry.ts`):**
+- `ThemeConfig` interface defines class-string tokens for every themed surface: `wrapper`, `header`, `gamingArea`, `table`, `card`, `deck`, `roster`, `results`, `gameControls`, `countdown`
+- Two themes registered in `THEMES`: `'16bit'` (declared first → appears first in dropdowns; pre-selected default), `'classic'` (declared second)
+- Both themes define light + dark mode variants via Tailwind `dark:` classes plus CSS-var fallbacks
+- `gamingArea.background` fills the space between the vote-status bar and the card deck — provides a "lighter green floor" that the felt sits on
+- `getTheme(id)` returns the config; `getAllThemes()` returns the array (used by the Create Game dropdown — order matters)
+
+**Discovery / SEO foundation (Phase 5, shipped April 2026):**
+- `client/index.html` — full `<head>` metadata: title with tagline, description, keywords, canonical URL, theme-color, Open Graph tags, Twitter Card tags, favicon, JSON-LD `SoftwareApplication` structured data, `<noscript>` fallback with marketing copy
+- `client/public/favicon.svg` — 16-bit themed mark
+- `client/public/og-image.png` — 1200×630 social preview, Balatro-style green felt + wordmark + tagline
+- `client/public/robots.txt` — allows public routes, disallows `/session/*` and `/api/*`, points to sitemap
+- `client/public/sitemap.xml` — lists `/`, `/create`, `/join`, `/privacy`
+- `client/public/llms.txt` — markdown summary per [llmstxt.org](https://llmstxt.org/) for LLM crawlers and training corpora
+- `.github/FUNDING.yml` — enables the repo-page Sponsor button via `github: francis-eye`
+- GitHub repo topics live: `agile`, `no-signup`, `planning-poker`, `react`, `real-time`, `scrum`, `socket-io`, `sprint-planning`, `story-points`, `typescript`, `vite`
+
+**Tagline conventions:**
+- Landing page H1 (emotional voice): *"Sprint planning that feels like game night."*
+- All machine-readable metadata (title, OG, Twitter, JSON-LD, llms.txt): *"Real-time planning poker for distributed teams"*
+
 ### What Could Be Built Next
 
 - More table themes — Dark Mode, Casino Royale, Sketch/Whiteboard (see PRD_GAME_TABLE_THEMES.md for candidates)
@@ -81,6 +116,8 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 - Session history & export — save results for retrospectives
 - Jira integration — pull stories directly into rounds
 - Re-Vote UX enhancement — the "Re-voting..." chip exists but could retain ticket context
+- Discovery Phase 2 — prerender `/` and `/privacy` at build time (`@prerenderer/rollup-plugin` or `vite-plugin-prerender-spa-plus`) so landing-page marketing copy is in the initial HTML for crawlers that don't run JS
+- Discovery Phase 3 — Product Hunt + AlternativeTo + agile-tooling-list submissions; README screenshots; Show HN post; FAQ page with `FAQPage` schema
 
 ## Core Concepts
 
@@ -117,6 +154,9 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 | Countdown | Client-side 3→2→1 animation; server sets phase to 'revealed' immediately |
 | Host transfer | Host can promote any connected player to host; old host becomes a player |
 | Vote secrecy | Server never broadcasts vote values until host reveals; only hasVoted: true is sent |
+| Default table theme | 16-Bit Mode (Balatro-inspired) — team feedback rated it more engaging than Classic. Hosts can switch to Classic per session. |
+| Monetization | Zero-friction tip jar via GitHub Sponsors footer link. No paywalls, no accounts, no rate limits. Goal is break-even on $5/mo Railway hosting. |
+| Canonical URL | `https://storyhand-production.up.railway.app/` — baked into all OG/Twitter/JSON-LD/sitemap/robots/llms metadata. |
 
 ## File Structure
 
@@ -125,13 +165,22 @@ storyhand/
 ├── CLAUDE.md
 ├── README.md
 ├── package.json              # Root scripts: install:all, build, start
+├── .github/
+│   └── FUNDING.yml           # Enables repo-page Sponsor button (github: francis-eye)
 ├── client/
+│   ├── index.html            # Full <head> metadata: OG, Twitter, JSON-LD, favicon, <noscript>
+│   ├── public/               # Static assets copied verbatim into dist/ at build time
+│   │   ├── favicon.svg       # 16-bit themed mark
+│   │   ├── og-image.png      # 1200x630 social preview (Balatro-style felt + wordmark)
+│   │   ├── robots.txt        # Allows public routes; disallows /session/* and /api/*
+│   │   ├── sitemap.xml       # /, /create, /join, /privacy
+│   │   └── llms.txt          # Markdown summary per llmstxt.org
 │   ├── src/
 │   │   ├── components/       # Header, SessionHeader, CardDeck, PlayingCard, GameTable,
 │   │   │                     # PlayerRoster, PlayerAvatar, HostControls, ResultsPanel
 │   │   ├── pages/            # LandingPage, CreateGamePage, JoinSessionPage, SessionPage, PrivacyPage
 │   │   ├── hooks/            # useGameState (Socket.IO client + React Context), useIsMobile
-│   │   ├── themes/           # themeRegistry.ts (ThemeConfig interface + theme definitions)
+│   │   ├── themes/           # themeRegistry.ts (ThemeConfig + 16bit/classic configs)
 │   │   ├── types/            # game.ts
 │   │   ├── utils/            # session.ts
 │   │   ├── App.tsx
@@ -143,7 +192,9 @@ storyhand/
 │   ├── index.js              # Express + Socket.IO server + static file serving
 │   ├── sessionManager.js     # In-memory session state + disconnect timers + stats
 │   └── package.json
-└── docs/
+├── tasks/
+│   └── lessons.md            # Append after every correction; review at session start
+└── docs/                     # Gitignored. PRDs, bug reports, scratch.
 ```
 
 ## Architectural Invariants — Never Violate These
