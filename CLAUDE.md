@@ -27,23 +27,27 @@ A multiplayer web app where a Host creates an estimation session, shares a Sessi
 - **Database:** None — all session data lives in memory and is purged on expiration
 - **Deployment:** Railway (auto-deploys from GitHub)
 
-## Current State (as of April 2026)
+## Current State (as of June 2026)
 
 ### What's Built — Everything is functional and deployed
 
-Phases 1–4 are complete. The app is fully playable with real-time multiplayer, deployed on Railway, and ready for team use. Phase 5 (SEO + agentic discovery foundation) is also live.
+Phases 1–4 are complete. The app is fully playable with real-time multiplayer, deployed on Railway, and ready for team use. Phase 5 (SEO + agentic discovery foundation) is live. Phase 6 (full-arcade 16-bit front door — the entire pre-game funnel re-skinned to match the default 16-Bit Mode) is also live.
 
 **Live URL:** `https://storyhand-production.up.railway.app/` (canonical — note the `-production` segment; the bare `storyhand.up.railway.app` does NOT resolve).
 
 **Pages (5 pages):**
-- `LandingPage.tsx` — Hero with "Create Game" and "Join Game" CTAs, daily activity stats, footer with Privacy / ♥ Sponsor (GitHub Sponsors) / GitHub links
-- `CreateGamePage.tsx` — Game name, host name, voting system, table theme dropdown (16-Bit Mode is the pre-selected default; Classic is the second option), collapsible advanced settings (average, countdown, timeout slider)
-- `JoinSessionPage.tsx` — Session ID input (6-char, uppercase), role selector cards (Player/Observer), conditional name field, error display for invalid sessions. Supports invite links via `/join/:sessionId` route (pre-fills session ID)
+- `LandingPage.tsx` — **Full-arcade 16-bit landing** (felt background + CRT scanline overlay): own inline nav with the pixel `Logo`, pixel hero (mobile-safe pre-broken H1, cream payoff word for light-felt contrast, "No account · No credit card · Free & open-source" trust beat), `LiveSessionDemo` arcade cabinet, neon "scoreboard" stats panel (from `/api/stats`), pixel-panel How-It-Works / Gamification / Features sections, inline footer with Privacy / ♥ Sponsor / GitHub. CTAs: "Deal Me In" / "Join With Code"
+- `CreateGamePage.tsx` — **Arcade-themed** (wrapped in `ArcadeShell`): pixel-panel form with terminal-style pixel inputs, real readonly Voting System field, table theme dropdown (16-Bit Mode is the pre-selected default; Classic is the second option) styled with a surviving caret, collapsible advanced settings (neon-tinted native checkboxes + range), red poker "Create Game" button
+- `JoinSessionPage.tsx` — **Arcade-themed** (wrapped in `ArcadeShell`): big centered "cheat-code" Session ID input, neon Player/Observer role cards (orange selected state), conditional name field, on-theme error display. Supports invite links via `/join/:sessionId` route (pre-fills session ID)
 - `SessionPage.tsx` — Full session layout with sidebar roster, game table, card deck (Players), host controls (Host). Mobile responsive (horizontal roster, compact table, scroll indicators). Themed via theme registry
 - `PrivacyPage.tsx` — Privacy policy covering data collection, storage, and sharing practices
 
-**Components (9 components):**
-- `Header.tsx` — Storyhand text logo, Exit button on non-landing pages
+> Note: the marketing/funnel arcade look ships as a **decoupled global CSS layer** in `index.css` (classes like `.felt-page`, `.scanlines-overlay`, `.pixel-panel`, `.pixel-input`, `.btn-pixel-*`, `.neon-border`, `.theme-16bit-glow-green`) plus the small `ArcadeShell` + `Logo` components. It **reuses the session theme's hex tokens but is NOT routed through `themeRegistry.ts`** — the session theme registry is untouched. Body copy uses the VT323 pixel font (legible), headlines/labels use Press Start 2P (`.font-pixel`).
+
+**Components (key components):**
+- `Header.tsx` — Renders the pixel `Logo` on a dark-navy + neon-green brand bar (appears on all non-landing routes, including `/session`); pixel-styled Feedback + Exit buttons on non-landing pages
+- `Logo.tsx` — Brand lockup: inline-SVG pixel "Card S" mark (cream card + crimson "hand" card behind it + neon-green pixel "S") + `STORY`(green)/`HAND`(gold) Press Start 2P wordmark. `variant` horizontal/stacked; collapses to mark-only below 460px so navs fit at 320px
+- `marketing/ArcadeShell.tsx` — Presentational wrapper that gives a funnel page the felt background + vignette + scanline overlay (content lifted to `z-10`). Used by Create/Join
 - `SessionHeader.tsx` — Game name, round counter, phase chip (color-coded), re-voting indicator, invite link copy button + Session ID with copy-to-clipboard
 - `PlayerRoster.tsx` — Grouped by role (Host → Players → Observers), with dividers and counts, vote status indicators
 - `PlayerAvatar.tsx` — Colored initial avatar, role badges (crown/eye), vote status, disconnected visual treatment (greyed out + red label)
@@ -97,7 +101,7 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 
 **Discovery / SEO foundation (Phase 5, shipped April 2026):**
 - `client/index.html` — full `<head>` metadata: title with tagline, description, keywords, canonical URL, theme-color, Open Graph tags, Twitter Card tags, favicon, JSON-LD `SoftwareApplication` structured data, `<noscript>` fallback with marketing copy
-- `client/public/favicon.svg` — 16-bit themed mark
+- `client/public/favicon.svg` — 16-bit themed mark (font-independent pixel "S" rects on dark felt — crisp at 16px, matches the `Logo` card mark's DNA)
 - `client/public/og-image.png` — 1200×630 social preview, Balatro-style green felt + wordmark + tagline
 - `client/public/robots.txt` — allows public routes, disallows `/session/*` and `/api/*`, points to sitemap
 - `client/public/sitemap.xml` — lists `/`, `/create`, `/join`, `/privacy`
