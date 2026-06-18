@@ -14,11 +14,16 @@ import SessionSummaryCard from '../components/SessionSummaryCard';
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
   const navigate = useNavigate();
-  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, clearSessionSummary } = useGameState();
+  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, lastSettings, clearSessionSummary } = useGameState();
 
   // One place renders the end-of-session summary. It matches the theme the session
   // was using (captured before state cleared) and offers Play Again / Home.
-  const playAgain = () => { clearSessionSummary(); navigate('/create'); };
+  // Play Again carries the ended session's settings into the Create form (via router state).
+  const playAgain = () => {
+    const prefill = lastSettings;
+    clearSessionSummary();
+    navigate('/create', prefill ? { state: { prefill } } : undefined);
+  };
   const goHome = () => { clearSessionSummary(); navigate('/'); };
 
   // While reconnecting after page refresh, show a loading state instead of flashing "No active session"

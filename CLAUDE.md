@@ -56,6 +56,7 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 - `PlayingCard.tsx` — 3D CSS flip animation, three sizes (small/medium/large), face-down gradient design, face-up with corner values
 - `HostControls.tsx` — Floating dark pill with context-aware buttons: "Reveal Cards" (voting), "Re-Vote" + "New Round" (revealed), countdown display
 - `ResultsPanel.tsx` — Average, vote count, consensus banner, high-variance warning, vote distribution bar chart
+- `SessionSummaryCard.tsx` — End-of-session recap modal (rounds/duration/players, consensus rate, best streak, MVP awards, Copy Summary). **Theme-matched**: full-arcade 16-bit for 16-Bit sessions, clean card for Classic (theme + settings captured into `useGameState.summaryTheme`/`lastSettings` before state clears). Actions: **Play Again** (opens Create pre-filled with the ended session's settings via router state) + **Home**. Shown for deliberate end, inactivity timeout (server now sends a summary on timeout too), and any `session-expired` broadcast. The facilitator's Exit shows a themed "End session for everyone?" confirmation first
 
 **State Management (`useGameState.tsx`):**
 - React Context provider wrapping the app
