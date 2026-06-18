@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import type { GameSettings, TableTheme } from '../types/game';
 import { getAllThemes } from '../themes/themeRegistry';
@@ -15,15 +15,19 @@ const SELECT_CARET =
 // Create game form: game name, host name, voting system, advanced settings
 export default function CreateGamePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { actions } = useGameState();
 
-  const [gameName, setGameName] = useState('');
+  // "Play Again" passes the ended session's settings here to pre-fill the form.
+  const prefill = (location.state as { prefill?: GameSettings } | null)?.prefill;
+
+  const [gameName, setGameName] = useState(prefill?.gameName ?? '');
   const [hostName, setHostName] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showAverage, setShowAverage] = useState(true);
-  const [showCountdown, setShowCountdown] = useState(true);
-  const [inactivityTimeout, setInactivityTimeout] = useState(30);
-  const [tableTheme, setTableTheme] = useState<TableTheme>('16bit');
+  const [showAverage, setShowAverage] = useState(prefill?.showAverage ?? true);
+  const [showCountdown, setShowCountdown] = useState(prefill?.showCountdown ?? true);
+  const [inactivityTimeout, setInactivityTimeout] = useState(prefill?.inactivityTimeout ?? 30);
+  const [tableTheme, setTableTheme] = useState<TableTheme>(prefill?.tableTheme ?? '16bit');
 
   const canCreate = gameName.trim() && hostName.trim();
 

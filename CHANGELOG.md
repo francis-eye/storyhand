@@ -21,6 +21,17 @@ All notable changes to Storyhand are documented here. Format loosely follows
   motion; contrast tuned for the light-felt variant; verified no horizontal overflow
   at 320px.
 
+### Changed — Session-complete modal redesign (2026-06-18)
+- The end-of-session summary now **matches the session's theme**: full-arcade 16-bit
+  (pixel panel, neon, red poker button) for 16-Bit sessions, clean card for Classic.
+- **No more dead-end** — "Done → home" is replaced with **Play Again** and **Home**.
+  Play Again opens the Create form **pre-filled with the ended session's settings**
+  (game name, theme, average/countdown/timeout).
+- **Safer exit** — the facilitator's Exit now shows a themed "End session for
+  everyone?" confirmation instead of instantly ending the room for all participants.
+- **Inactivity timeouts now show the same recap card** (the server computes and sends
+  the summary on timeout) instead of a bare "Session has ended." error.
+
 ### Notes
 - Implemented as a decoupled global CSS layer in `client/src/index.css` plus
   `ArcadeShell` and `Logo` components. The in-session theme registry

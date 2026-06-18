@@ -64,6 +64,7 @@ interface GameContextValue {
   currentAchievement: Achievement | null;
   sessionSummary: SessionSummary | null;
   summaryTheme: TableTheme | null;
+  lastSettings: GameSettings | null;
   clearSessionSummary: () => void;
 }
 
@@ -91,6 +92,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // Theme the session was using when it ended — captured before state clears so the
   // summary modal can match the session's look (the summary renders when state is null).
   const [summaryTheme, setSummaryTheme] = useState<TableTheme | null>(null);
+  // Settings of the session that just ended — lets "Play Again" pre-fill the Create form.
+  const [lastSettings, setLastSettings] = useState<GameSettings | null>(null);
 
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
@@ -231,8 +234,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     socket.on('session-expired', ({ summary }: { summary?: SessionSummary } = {}) => {
       if (summary) {
-        // Capture the active session's theme before state clears, so the summary matches.
+        // Capture the active session's theme + settings before state clears, so the
+        // summary matches and "Play Again" can pre-fill.
         setSummaryTheme(gameStateRef.current?.settings.tableTheme ?? '16bit');
+        setLastSettings(gameStateRef.current?.settings ?? null);
         setSessionSummary(summary);
       }
       setState(null);
@@ -446,6 +451,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.emit('end-session', { sessionId: state.sessionId }, (response: any) => {
       if (response.summary) {
         setSummaryTheme(state.settings.tableTheme);
+        setLastSettings(state.settings);
         setSessionSummary(response.summary);
       }
       clearStoredSession();
@@ -524,10 +530,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const clearSessionSummary = useCallback(() => {
     setSessionSummary(null);
     setSummaryTheme(null);
+    setLastSettings(null);
   }, []);
 
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, clearSessionSummary }}>
+    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, lastSettings, clearSessionSummary }}>
       {children}
     </GameContext.Provider>
   );
