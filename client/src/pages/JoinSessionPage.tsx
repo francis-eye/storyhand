@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import type { Role } from '../types/game';
 import Footer from '../components/Footer';
+import ArcadeShell from '../components/marketing/ArcadeShell';
 
 // Join session form: session ID input, role selector cards, name field
 export default function JoinSessionPage() {
@@ -32,103 +33,98 @@ export default function JoinSessionPage() {
     }
   };
 
+  const labelClass = 'block font-pixel text-[10px] uppercase tracking-wider text-[#33ff33] mb-2';
+  // Role card base + selected styling (explicit Tailwind borders so the selected
+  // state cleanly overrides — the dark navy fill is the legibility substrate).
+  const roleCard = (active: boolean) =>
+    `p-4 text-center border-2 bg-[#1a1a2e] transition-all ${
+      active
+        ? 'border-[#ffa500] ring-2 ring-[#ffa500]/40'
+        : 'border-[#33ff33]/30 hover:border-[#33ff33]/60'
+    }`;
+
   return (
-    <div className="max-w-md mx-auto mt-12 px-4 relative">
-      {/* Decorative gradient blobs */}
-      <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full opacity-40 pointer-events-none" style={{ background: 'radial-gradient(circle, #e0deff 0%, transparent 70%)' }} />
-      <div className="absolute -bottom-10 -right-10 w-48 h-48 rounded-full opacity-40 pointer-events-none" style={{ background: 'radial-gradient(circle, #fef3c7 0%, transparent 70%)' }} />
+    <ArcadeShell>
+      <div className="max-w-md mx-auto px-4 py-12">
+        {/* Form card */}
+        <div className="pixel-panel p-6">
+          <h2 className="font-pixel text-lg text-[#33ff33] theme-16bit-glow-green mb-6 text-center">JOIN A SESSION</h2>
 
-      {/* Form card */}
-      <div className="relative bg-[var(--surface-elevated)] rounded-2xl p-6 shadow-sm border border-[var(--border-subtle)]">
-        <h2 className="text-2xl font-black mb-6 text-gray-800 dark:text-white">Join a Session</h2>
+          {isInviteLink && (
+            <p className="font-pixel-body text-lg text-[#f5e6c8]/85 mb-5 text-center">
+              You've been invited to session{' '}
+              <span className="font-pixel text-xs text-[#ffa500]">{sessionId}</span>
+            </p>
+          )}
 
-        {isInviteLink && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            You've been invited to session <span className="font-mono font-semibold">{sessionId}</span>
-          </p>
-        )}
-
-        <div className="flex flex-col gap-5">
-          {/* Session ID */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Session ID</label>
-            <input
-              type="text"
-              value={sessionId}
-              onChange={e => setSessionId(e.target.value.toUpperCase().slice(0, 6))}
-              placeholder="ABC123"
-              maxLength={6}
-              readOnly={isInviteLink}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-space-mono text-lg tracking-widest text-center uppercase dark:bg-[var(--input-bg)] dark:border-[var(--input-border)] dark:text-[var(--text-primary)]
-                ${isInviteLink ? 'bg-gray-100 text-gray-500 cursor-default' : ''}`}
-            />
-          </div>
-
-          {/* Role selector cards */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Your Role</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setRole('player')}
-                className={`p-4 rounded-2xl border-2 text-center transition-all
-                  ${role === 'player'
-                    ? 'border-[#4f46e5] bg-[#f0edff] dark:bg-[#4f46e5]/10'
-                    : 'border-gray-200 dark:border-gray-700 bg-[var(--surface-elevated)] hover:border-gray-300'
-                  }`}
-              >
-                <p className="text-2xl mb-1">🃏</p>
-                <p className="font-medium text-gray-800 dark:text-gray-200">Player</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Vote on estimates</p>
-              </button>
-              <button
-                onClick={() => setRole('observer')}
-                className={`p-4 rounded-2xl border-2 text-center transition-all
-                  ${role === 'observer'
-                    ? 'border-[#4f46e5] bg-[#f0edff] dark:bg-[#4f46e5]/10'
-                    : 'border-gray-200 dark:border-gray-700 bg-[var(--surface-elevated)] hover:border-gray-300'
-                  }`}
-              >
-                <p className="text-2xl mb-1">👁</p>
-                <p className="font-medium text-gray-800 dark:text-gray-200">Observer</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Watch silently</p>
-              </button>
-            </div>
-          </div>
-
-          {/* Name field (only for players) */}
-          {role === 'player' && (
+          <div className="flex flex-col gap-6">
+            {/* Session ID — arcade "cheat code" entry */}
             <div>
-              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Your Name</label>
+              <label className={labelClass}>Session ID</label>
               <input
                 type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Enter your name"
-                maxLength={20}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-[var(--input-bg)] dark:border-[var(--input-border)] dark:text-[var(--text-primary)]"
+                value={sessionId}
+                onChange={e => setSessionId(e.target.value.toUpperCase().slice(0, 6))}
+                placeholder="ABC123"
+                maxLength={6}
+                readOnly={isInviteLink}
+                className={`pixel-input pixel-input-code ${isInviteLink ? 'cursor-default opacity-70' : ''}`}
               />
-              <p className="text-xs text-gray-400 mt-1 text-right">{name.length}/20</p>
             </div>
-          )}
 
-          {/* Error message */}
-          {joinError && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{joinError}</p>
-          )}
+            {/* Role selector cards */}
+            <div>
+              <label className={labelClass}>Your Role</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setRole('player')} className={roleCard(role === 'player')}>
+                  <p className="text-2xl mb-2">🃏</p>
+                  <p className="font-pixel text-[10px] uppercase text-[#f5e6c8]">Player</p>
+                  <p className="font-pixel-body text-base text-[#f5e6c8]/60 mt-1">Vote on estimates</p>
+                </button>
+                <button onClick={() => setRole('observer')} className={roleCard(role === 'observer')}>
+                  <p className="text-2xl mb-2">👁</p>
+                  <p className="font-pixel text-[10px] uppercase text-[#f5e6c8]">Observer</p>
+                  <p className="font-pixel-body text-base text-[#f5e6c8]/60 mt-1">Watch silently</p>
+                </button>
+              </div>
+            </div>
 
-          {/* Join button */}
-          <button
-            onClick={handleJoin}
-            disabled={!canJoin}
-            className="mt-2 w-full py-3 text-white rounded-xl font-bold text-lg transition-all hover:shadow-xl hover:shadow-indigo-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-            style={{ background: '#4f46e5' }}
-          >
-            Join Session
-          </button>
+            {/* Name field (only for players) */}
+            {role === 'player' && (
+              <div>
+                <label className={labelClass}>Your Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="Enter your name"
+                  maxLength={20}
+                  className="pixel-input"
+                />
+                <p className="font-pixel-body text-base text-[#f5e6c8]/50 mt-1 text-right">{name.length}/20</p>
+              </div>
+            )}
+
+            {/* Error message */}
+            {joinError && (
+              <p className="font-pixel-body text-lg text-[#ff8a8a] bg-[#8b1a1a]/30 border-2 border-red-600 px-3 py-2">
+                {joinError}
+              </p>
+            )}
+
+            {/* Join button */}
+            <button
+              onClick={handleJoin}
+              disabled={!canJoin}
+              className="btn-pixel-primary w-full"
+            >
+              Join Session
+            </button>
+          </div>
         </div>
-      </div>
 
-      <Footer />
-    </div>
+        <Footer arcade />
+      </div>
+    </ArcadeShell>
   );
 }

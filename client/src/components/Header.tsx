@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useGameState } from '../hooks/useGameState';
 import { useFeedback } from '../hooks/useFeedback';
 import DarkModeToggle from './DarkModeToggle';
+import Logo from './Logo';
 
 // App header with Storyhand logo and navigation
 export default function Header() {
@@ -29,16 +30,13 @@ export default function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white dark:bg-[#12121f] dark:border-gray-700">
+    <header className="flex items-center justify-between px-4 sm:px-6 py-4 bg-[#1a1a2e] border-b-2 border-[#33ff33]/30">
       <button
         onClick={inSession ? handleExit : () => navigate('/')}
-        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        className="flex items-center hover:opacity-80 transition-opacity"
       >
-        {/* Storyhand text logo */}
-        <span className="text-xl font-bold tracking-tight font-space-mono">
-          <span className="text-blue-600">Story</span>
-          <span className="text-gray-800 dark:text-gray-200">hand</span>
-        </span>
+        {/* Storyhand pixel logo: card "S" mark + neon wordmark */}
+        <Logo variant="horizontal" />
       </button>
 
       <div className="flex items-center gap-2">
@@ -46,7 +44,7 @@ export default function Header() {
         {!isLanding && (
           <button
             onClick={openFeedback}
-            className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="font-pixel text-[10px] uppercase tracking-wider text-[#ffa500]/70 hover:text-[#ffa500] border-2 border-[#ffa500]/40 hover:border-[#ffa500] px-3 py-2 rounded-none transition-colors"
           >
             Feedback
           </button>
@@ -54,7 +52,7 @@ export default function Header() {
         {!isLanding && (
           <button
             onClick={handleExit}
-            className="text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            className="font-pixel text-[10px] uppercase tracking-wider text-[#ffa500]/70 hover:text-[#ffa500] border-2 border-[#ffa500]/40 hover:border-[#ffa500] px-3 py-2 rounded-none transition-colors"
           >
             Exit
           </button>
