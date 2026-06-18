@@ -671,6 +671,10 @@ export class SessionManager {
       const timeoutMs = (session.settings.inactivityTimeout || 30) * 60 * 1000;
       if (now - session.lastActivityAt > timeoutMs) {
         console.log(`Session ${sessionId} expired due to inactivity (${session.settings.inactivityTimeout} min)`);
+
+        // Compute the summary BEFORE deleting so a timeout ends with the same
+        // recap card as a deliberate end-session (not a bare error).
+        const summary = this.computeSessionSummary(session);
         this.sessions.delete(sessionId);
 
         // Clean up any disconnect timers for this session
@@ -682,7 +686,7 @@ export class SessionManager {
         }
 
         if (this.onBroadcast) {
-          this.onBroadcast(sessionId, 'session-expired', {});
+          this.onBroadcast(sessionId, 'session-expired', { summary });
         }
       }
     }

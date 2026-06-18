@@ -14,7 +14,12 @@ import SessionSummaryCard from '../components/SessionSummaryCard';
 // Full session view: sidebar roster, game table, card deck, host controls
 export default function SessionPage() {
   const navigate = useNavigate();
-  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, clearSessionSummary } = useGameState();
+  const { state, currentPlayerId, selectedCard, actions, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, clearSessionSummary } = useGameState();
+
+  // One place renders the end-of-session summary. It matches the theme the session
+  // was using (captured before state cleared) and offers Play Again / Home.
+  const playAgain = () => { clearSessionSummary(); navigate('/create'); };
+  const goHome = () => { clearSessionSummary(); navigate('/'); };
 
   // While reconnecting after page refresh, show a loading state instead of flashing "No active session"
   if (isReconnecting) {
@@ -25,15 +30,14 @@ export default function SessionPage() {
     );
   }
 
-  // Show session summary overlay even when state is null (session just ended)
-  if (!state && sessionSummary) {
+  // Show the session summary whenever one exists (state is cleared when a session ends).
+  if (sessionSummary) {
     return (
       <SessionSummaryCard
         summary={sessionSummary}
-        onDone={() => {
-          clearSessionSummary();
-          navigate('/');
-        }}
+        themeId={summaryTheme ?? '16bit'}
+        onPlayAgain={playAgain}
+        onHome={goHome}
       />
     );
   }
@@ -141,15 +145,6 @@ export default function SessionPage() {
         />
       )}
 
-      {sessionSummary && (
-        <SessionSummaryCard
-          summary={sessionSummary}
-          onDone={() => {
-            clearSessionSummary();
-            navigate('/');
-          }}
-        />
-      )}
     </div>
   );
 }

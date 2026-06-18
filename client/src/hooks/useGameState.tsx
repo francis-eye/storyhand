@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { io } from 'socket.io-client';
 import type { GameState, Player, Role, CardValue, GamePhase, Achievement, SessionSummary } from '../types/game';
-import type { GameSettings } from '../types/game';
+import type { GameSettings, TableTheme } from '../types/game';
 import { getStoredSession, storeSession, clearStoredSession, refreshSessionTimestamp } from '../utils/session';
 
 // ── Module-scope singleton ────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ interface GameContextValue {
   clearMissedRounds: () => void;
   currentAchievement: Achievement | null;
   sessionSummary: SessionSummary | null;
+  summaryTheme: TableTheme | null;
   clearSessionSummary: () => void;
 }
 
@@ -87,6 +88,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [missedRounds, setMissedRounds] = useState<number>(0);
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
+  // Theme the session was using when it ended — captured before state clears so the
+  // summary modal can match the session's look (the summary renders when state is null).
+  const [summaryTheme, setSummaryTheme] = useState<TableTheme | null>(null);
 
   // Pending reveal data — stored while countdown runs, applied when it finishes
   const pendingRevealRef = useRef<Player[] | null>(null);
@@ -227,6 +231,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     socket.on('session-expired', ({ summary }: { summary?: SessionSummary } = {}) => {
       if (summary) {
+        // Capture the active session's theme before state clears, so the summary matches.
+        setSummaryTheme(gameStateRef.current?.settings.tableTheme ?? '16bit');
         setSessionSummary(summary);
       }
       setState(null);
@@ -439,6 +445,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (!state) return;
     socket.emit('end-session', { sessionId: state.sessionId }, (response: any) => {
       if (response.summary) {
+        setSummaryTheme(state.settings.tableTheme);
         setSessionSummary(response.summary);
       }
       clearStoredSession();
@@ -514,10 +521,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const clearMissedRounds = useCallback(() => setMissedRounds(0), []);
-  const clearSessionSummary = useCallback(() => setSessionSummary(null), []);
+  const clearSessionSummary = useCallback(() => {
+    setSessionSummary(null);
+    setSummaryTheme(null);
+  }, []);
 
   return (
-    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, clearSessionSummary }}>
+    <GameContext.Provider value={{ state, currentPlayerId, selectedCard, actions, error, isReconnecting, missedRounds, clearMissedRounds, currentAchievement, sessionSummary, summaryTheme, clearSessionSummary }}>
       {children}
     </GameContext.Provider>
   );
