@@ -135,7 +135,8 @@ beforeAll(() => {
         socket.to(sessionId).emit('player-reconnected', { playerId });
       });
 
-      socket.on('play-card', ({ sessionId, playerId, value }) => {
+      socket.on('play-card', ({ sessionId, value }) => {
+        const playerId = socket.data.playerId; // authoritative identity — mirrors index.js
         const result = sessionManager.playCard(sessionId, playerId, value);
         if (result.error) return;
         io.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
