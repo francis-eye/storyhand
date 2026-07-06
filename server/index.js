@@ -145,7 +145,11 @@ io.on('connection', (socket) => {
   });
 
   // --- Play a card ---
-  socket.on('play-card', ({ sessionId, playerId, value }) => {
+  socket.on('play-card', ({ sessionId, value }) => {
+    // Attribute the vote to the socket's OWN identity, never a client-supplied
+    // playerId. Every player's UUID is broadcast in the roster, so trusting a
+    // payload playerId would let one participant cast votes as anyone else.
+    const playerId = socket.data.playerId;
     const result = sessionManager.playCard(sessionId, playerId, value);
 
     if (result.error) {

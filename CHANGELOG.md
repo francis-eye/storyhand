@@ -5,6 +5,20 @@ All notable changes to Storyhand are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Security & Fixed — Vote integrity + dependency patch (2026-07-06)
+- **Votes are now tied to the sender's own identity.** Previously a participant could
+  cast or change a vote under another player's name by supplying that player's ID. The
+  server now ignores any client-supplied player ID on `play-card` and attributes the
+  vote to the socket that sent it, so no one can vote on someone else's behalf (which
+  also keeps the average, consensus, and MVP stats honest).
+- **Patched a high-severity WebSocket dependency** (`ws` 8.18.3 → 8.21.0) via
+  `npm audit fix` — clears all production `npm audit` advisories. No app dependencies
+  changed, lockfile only.
+- **Hardened `.gitignore`** to ignore `.env` files (bare `.env` was not previously
+  ignored — only `*.local` was), preventing accidental commit of webhook/secret env vars.
+- **Docs:** corrected CLAUDE.md to reflect that Reveal / New Round / Re-Vote are
+  intentional shared controls (any participant), not host-only.
+
 ### Added — Full-arcade 16-bit front door (2026-06-18)
 - The entire pre-game funnel (landing page, logo, Create Game, Join Session) is
   now a full-arcade 16-Bit Balatro experience that matches the default in-session

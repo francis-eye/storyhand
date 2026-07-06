@@ -127,7 +127,7 @@ Phases 1–4 are complete. The app is fully playable with real-time multiplayer,
 ## Core Concepts
 
 ### User Roles
-- **Host** — Voting facilitator. Creates the session, plays cards, reveals cards, starts new rounds, triggers re-votes. Can transfer host role to any player.
+- **Host** — Voting facilitator. Creates the session and plays cards. Has host-only controls: kick player, end session. Revealing cards, starting new rounds, and triggering re-votes are **shared controls** — any participant can trigger them (intentional; enforced by the "Shared Game Controls" tests in `server/tests/auto-reveal-and-resilience.test.mjs`). Can transfer host role to any player.
 - **Player** — Named participant who selects cards to estimate effort. Auto-removed after 2 minutes of disconnection.
 - **Observer** — Anonymous (unnamed) participant who watches the session but cannot vote.
 
@@ -316,7 +316,7 @@ The client (`useGameState.tsx`) should check for `response.error` and surface it
 - `join-session` with an invalid or expired session ID → `{ error: 'Session not found' }`
 - `join-session` when session is full (50 players) → `{ error: 'Session is full' }`
 - `play-card` when phase is not 'voting' → `{ error: 'Not in voting phase' }`
-- `reveal-cards` / `new-round` / `re-vote` from a non-host → `{ error: 'Only the host can do this' }`
+- `kick-player` / `end-session` from a non-facilitator → `{ error: 'Only the facilitator can ...' }` (NOTE: `reveal-cards` / `new-round` / `re-vote` are **shared** — any participant may trigger them, by design, so they return no authz error)
 - `reconnect-session` with invalid player/session IDs → `{ error: 'Could not reconnect' }`
 
 ### Server-Side Logging:
@@ -382,10 +382,10 @@ If any step fails, fix it before committing. Do not push broken code.
 - `create-session` { settings: GameSettings, hostName: string } → callback with { sessionId, hostId, gameState }
 - `join-session` { sessionId: string, role: Role, name?: string } → callback with { playerId, gameState } or error
 - `reconnect-session` { sessionId: string, playerId: string } → callback with { gameState } or error
-- `play-card` { sessionId: string, playerId: string, value: CardValue }
-- `reveal-cards` { sessionId: string } (host only)
-- `new-round` { sessionId: string } (host only)
-- `re-vote` { sessionId: string } (host only)
+- `play-card` { sessionId: string, value: CardValue } — server attributes the vote to the socket's own player identity; a client-supplied `playerId` is ignored (prevents vote spoofing)
+- `reveal-cards` { sessionId: string } (shared — any participant)
+- `new-round` { sessionId: string } (shared — any participant)
+- `re-vote` { sessionId: string } (shared — any participant)
 - `transfer-host` { sessionId: string, newHostId: string } (host only)
 - `leave-session` { sessionId: string, playerId: string }
 

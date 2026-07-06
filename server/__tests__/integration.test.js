@@ -88,7 +88,8 @@ beforeAll(async () => {
       socket.to(sessionId).emit('player-reconnected', { playerId });
     });
 
-    socket.on('play-card', ({ sessionId, playerId, value }) => {
+    socket.on('play-card', ({ sessionId, value }) => {
+      const playerId = socket.data.playerId; // authoritative identity — mirrors index.js
       const result = sessionManager.playCard(sessionId, playerId, value);
       if (result.error) return;
       ioServer.to(sessionId).emit('card-played', { playerId, hasVoted: result.hasVoted });
@@ -565,6 +566,41 @@ describe('Socket.IO Integration Tests', () => {
     expect(event.value).toBeUndefined();
     expect(event.hasVoted).toBe(true);
     expect(event.playerId).toBe(p1Id);
+  });
+
+  it('play-card attributes the vote to the sender, not a spoofed playerId', async () => {
+    const hostSocket = createSocket();
+    const player1Socket = createSocket();
+    const player2Socket = createSocket();
+
+    const createResult = await new Promise((r) =>
+      hostSocket.emit('create-session', { settings: defaultSettings, hostName: 'Alice' }, r)
+    );
+    const { sessionId } = createResult.data;
+
+    const join1 = await new Promise((r) =>
+      player1Socket.emit('join-session', { sessionId, role: 'player', name: 'Bob' }, r)
+    );
+    const bobId = join1.data.playerId;
+
+    const join2 = await new Promise((r) =>
+      player2Socket.emit('join-session', { sessionId, role: 'player', name: 'Carol' }, r)
+    );
+    const carolId = join2.data.playerId;
+
+    // Bob's socket tries to vote AS Carol by passing Carol's playerId.
+    // The server must ignore the spoofed id and attribute the vote to Bob.
+    const cardPromise = waitForEvent(hostSocket, 'card-played');
+    player1Socket.emit('play-card', { sessionId, playerId: carolId, value: 8 });
+    const card = await cardPromise;
+
+    // Vote is attributed to Bob (the sender), not Carol
+    expect(card.playerId).toBe(bobId);
+
+    // Server state: Bob voted, Carol did not
+    const state = sessionManager.getGameState(sessionId);
+    expect(state.players.find((p) => p.id === bobId).hasVoted).toBe(true);
+    expect(state.players.find((p) => p.id === carolId).hasVoted).toBe(false);
   });
 
   it('full round: create → join → vote → reveal → new round', async () => {
