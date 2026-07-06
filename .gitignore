@@ -3,3 +3,10 @@ dist/
 .DS_Store
 *.local
 docs/
+.gstack/
+
+# Environment files (may hold FEEDBACK_WEBHOOK_URL and other secrets).
+# Bare `.env` is NOT matched by `*.local`, so ignore it explicitly.
+.env
+.env.*
+!.env.example
